@@ -1,0 +1,15 @@
+{
+  "name": "it-support-copilot",
+  "version": "0.0.0",
+  "private": true,
+  "description": "IT Support Copilot monorepo",
+  "engines": {
+    "node": ">=22 <25",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "validate": "node scripts/validate-structure.mjs",
+    "validate:structure": "node scripts/validate-structure.mjs"
+  }
+}
+
