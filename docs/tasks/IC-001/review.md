@@ -17,7 +17,7 @@ Status: **Awaiting review**
 
 ## Merge evidence
 
-- Pull request: Pending
+- Pull request: [#1 — IC-001: Monorepo and local developer setup](https://github.com/acarbonilla/it_copilot/pull/1)
 - Approved: No
 - Merged: No
 

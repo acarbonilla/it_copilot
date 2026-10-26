@@ -27,6 +27,7 @@ The repository was initialized locally and the required feature branch created. 
 
 - Initial repository commit: `009f7dd` (`chore: establish initial repository history`)
 - IC-001 implementation commit: `860d280` (`IC-001: establish monorepo and local developer setup`)
-- Pull request: Pending
+- Evidence commit: `5dc2462` (`IC-001: record implementation evidence`)
+- Pull request: [#1 — IC-001: Monorepo and local developer setup](https://github.com/acarbonilla/it_copilot/pull/1)
 - Merge: Prohibited until SOL review and Product Owner approval
 
