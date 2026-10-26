@@ -6,14 +6,14 @@ Status: **Awaiting review**
 
 ## SOL review
 
-- Reviewer: Pending
-- Decision: Pending
-- Findings: Pending
+- Reviewer: SOL
+- Decision: Verification follow-up requested; awaiting confirmation of the pushed evidence
+- Findings: Implementation was substantially complete. AC-04 and AC-05 required supported-Node validation, Docker Compose validation, and a clean-checkout README walkthrough. These checks were completed successfully on 2026-10-26 and recorded in `test-results.md`.
 
 ## Product Owner decision
 
 - Implementation authorization: Granted on 2026-10-26
-- Acceptance decision: Pending verification and SOL review
+- Acceptance decision: Pending final SOL confirmation and Product Owner approval
 
 ## Merge evidence
 

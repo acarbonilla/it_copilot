@@ -23,6 +23,12 @@ The repository was initialized locally and the required feature branch created. 
 - No framework generator was run; doing so would introduce later-task implementation and unreviewed dependency choices.
 - The full clean-clone workflow cannot be demonstrated until a remote and commit exist.
 
+## Verification completion
+
+After PR #1 was opened, verification was repeated from a new temporary clone using Node.js 24.13.0, npm 10.8.2, Docker CLI 29.9.2, and Docker Compose v5.6.1. `npm run validate` and `docker compose config --quiet` both returned exit code 0. The documented environment-copy step and local documentation paths were also verified, and the clean checkout ended without tracked changes. Exact commands and evidence are in [test-results.md](test-results.md).
+
+The earlier limitation about demonstrating a clean clone is therefore resolved. No application runtime or subsequent Task Code behavior was added.
+
 ## Commit and pull request
 
 - Initial repository commit: `009f7dd` (`chore: establish initial repository history`)
