@@ -25,7 +25,8 @@ The repository was initialized locally and the required feature branch created. 
 
 ## Commit and pull request
 
-- Commit: Pending
+- Initial repository commit: `009f7dd` (`chore: establish initial repository history`)
+- IC-001 implementation commit: `860d280` (`IC-001: establish monorepo and local developer setup`)
 - Pull request: Pending
 - Merge: Prohibited until SOL review and Product Owner approval
 

@@ -15,7 +15,7 @@
 | Compose YAML syntax | Pass | Python/PyYAML `yaml.safe_load` parsed `compose.yaml`. |
 | Docker Compose semantic validation | Not Run | Docker/Compose is not installed in the implementation environment. `docker` returned `CommandNotFoundException`. |
 | Git changed-file inspection | Pass | Status showed only the IC-001 root configuration and the new boundary/documentation directories. |
-| Candidate-file secret-pattern inspection | Pass | Ripgrep found no OpenAI key, AWS access-key, or private-key-header patterns outside `.git`; `.env` was confirmed ignored by `.gitignore:2`. |
+| Tracked-file secret-pattern inspection | Pass | Git-tracked content contained no OpenAI key, AWS access-key, or private-key-header patterns; `.env` was confirmed ignored by `.gitignore:2`. |
 | Documentation link targets | Pass | Every local file linked by `docs/README.md` exists. |
 | README local walkthrough | Pass | Commands, PowerShell environment-copy alternative, limitations, and directory names were checked against the workspace. Runtime startup was not claimed. |
 | Clean-clone walkthrough | Not Run | Requires a committed remote checkout. This remains acceptance evidence for review/PR validation. |
@@ -28,7 +28,7 @@
 | --- | --- |
 | AC-01, AC-06, AC-09 | Pass: structure and documentation records exist. |
 | AC-02 | Pass: root README documents prerequisites, setup, environment, layout, validation, and limitations. |
-| AC-03 | Pass: candidate files passed pattern inspection and `.env` is ignored. A post-commit tracked-file scan remains appropriate during review. |
+| AC-03 | Pass: tracked files passed credential-pattern inspection and `.env` is ignored. |
 | AC-04 | Partial: JSON and YAML syntax passed; Docker semantic validation and the supported-Node project command were not run. |
 | AC-05 | Partial: local documentation walkthrough passed; clean supported-environment checkout is Not Run. |
 | AC-07, AC-08 | Pass: initial workspace was empty and final status is confined to IC-001 structure/configuration/documentation. |
