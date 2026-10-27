@@ -1,7 +1,7 @@
 # IC-003 SOL review
 
 **Status:** Verification complete; awaiting SOL review
-**Task PR:** Pending  
+**Task PR:** [#6](https://github.com/acarbonilla/it_copilot/pull/6)
 **Target:** `feature/core-platform`
 
 ## Review checklist

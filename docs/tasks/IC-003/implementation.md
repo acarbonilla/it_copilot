@@ -1,9 +1,10 @@
 # IC-003 implementation
 
-**Status:** Ready for PR
+**Status:** In Review
 **Branch:** `task/IC-003-custom-user-roles`  
 **Target:** `feature/core-platform`  
 **Authorization:** Product Owner approval of D-01 through D-05, 2026-10-27
+**Pull request:** [#6](https://github.com/acarbonilla/it_copilot/pull/6)
 
 ## Scope implemented
 
