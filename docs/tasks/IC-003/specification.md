@@ -50,13 +50,55 @@ Application administration and IT documentation administration are separate priv
 | IC-003-AC-07 | IC-002 health API, structured errors and existing contenttypes migrations remain intact. |
 | IC-003-AC-08 | Model, role matrix, negative authorization, system and migration tests are recorded with actual results. |
 
-## Open design decisions — PO/SOL review before coding
+## SOL-finalized technical design decisions — pending Product Owner approval
 
-- **Email canonicalization:** define case-insensitive uniqueness policy and its MySQL collation implications; ensure no duplicates differing only by case.
-- **Django flags and privilege boundaries:** decide exact relationship of `is_staff`, `is_superuser`, and the separate App Admin flag; do not equate Django superuser with application authorization or owner-private access.
-- **No-IT-role representation:** choose nullable/blank role or explicit enum value, with default-deny semantics.
-- **Permission-helper interface:** define actions and inputs now without prematurely implementing IC-009 domain entities.
-- **Migration sequence:** inspect the current native MySQL `django_migrations` state; review the first custom-user migration and subsequent Django auth dependencies before applying. Escalate conflicts rather than rewriting already-applied migrations.
+These are implementation design choices derived from the baseline, **not new requirements quoted from the original TTDM document**.
+
+### D-01 — Email-based identity and uniqueness
+
+- Use a custom `User` extending `AbstractBaseUser` with `PermissionsMixin`, `USERNAME_FIELD = "email"`, and no username login field. Supply a custom manager implementing `create_user` and `create_superuser`.
+- Require nonblank valid email; normalize whitespace and canonicalize the entire email to lowercase on user creation and updates. Preserve a documented single canonicalization function for manager/model paths; do not assume Django's `normalize_email` lowercases the local part.
+- Enforce a database-level unique email constraint with an explicitly verified case-insensitive MySQL collation (and application validation), so `User@Example.com` and `user@example.com` cannot coexist even if writes bypass the manager. Verify collation and actual constraint behavior on native MySQL. Do not use an application-only uniqueness check.
+- Passwords use Django's password hashers; never store or log plaintext passwords.
+
+### D-02 — Separate Django framework flags and App Admin
+
+- Store independent `is_app_admin` (default `False`), `is_staff` (default `False`), `is_superuser` (default `False`), and `is_active` (default `True`).
+- `is_staff` gates potential future Django admin-site access only; `is_superuser` is a Django framework permission flag. Neither flag nor `is_app_admin` automatically grants IT documentation privileges or access to someone else's private Web documents/vault.
+- Application authorization MUST use explicit policy helpers rather than generic `has_perm` or a blanket `is_superuser` bypass. Never treat Django framework superuser as an exception to owner-private restrictions.
+- A `create_superuser` path may set Django `is_staff` and `is_superuser` as required by Django, but MUST NOT silently set `is_app_admin` or an IT role. Provisioning and last-active-App-Admin protections are separately scoped to IC-006/IC-007.
+- Disabled users (`is_active=False`) fail every protected application policy; IC-004 must enforce inactive login rejection and immediate access invalidation.
+
+### D-03 — Single IT role with explicit no-role default
+
+- Define `TextChoices` values `NONE`, `IT_DOC_ADMIN`, `IT_EDITOR`, `IT_MEMBER`. Store `NONE` as a non-null default. App Admin is a separate boolean, not an IT role.
+- An active user with `NONE` cannot access shared IT documents merely by holding `is_app_admin`, `is_staff`, or `is_superuser`.
+- Roles do not confer access to another user's private Web documents or vault. The role matrix in this specification remains authoritative; avoid assuming a role hierarchy beyond the listed actions.
+
+### D-04 — Backend policy-helper contract
+
+- Expose small, testable policy functions (suggested interfaces: `can_manage_it_categories(user)`, `can_create_it_document(user)`, `can_revise_it_document(user)`, `can_publish_it_document(user)`, `can_archive_it_document(user)`, `can_view_it_document(user, *, published, archived)`, `can_request_correction(user)`, `can_delete_it_document_permanently(user)`, and `can_access_private_resource(user, *, owner_id)`).
+- All helpers deny `None`, anonymous, inactive, and unrecognized-role users. The private-resource helper requires authenticated active user identity matching `owner_id`; there is no admin/superuser bypass.
+- IT Doc Admin: manage shared IT categories/documents and authorize audited permanent deletion (audit implementation belongs to IC-008); IT Editor: create, revise, publish, archive and review corrections; IT Member: view/search published or archived shared documents and request corrections. For ambiguous actions, default deny and request PO clarification rather than expanding privileges.
+- IC-003 delivers only role/policy logic and tests, not document/vault models, queries, UI, audit events, or CRUD endpoints. Later IC-009/IC-021 must enforce these policies in actual backend query and service paths.
+
+### D-05 — Custom-user-first migration graph
+
+1. Inspect and record the native MySQL `django_migrations` table, existing schema, and IC-002 contenttypes-only migration history. Confirm no auth/admin/session migration was previously applied; stop and escalate if present.
+2. Implement the custom user model in a new app's `0001_initial` migration and set `AUTH_USER_MODEL` to that model before enabling Django auth/admin/session apps or applying their migrations.
+3. Explicitly review the generated migration graph, including `swappable_dependency(settings.AUTH_USER_MODEL)`, Django auth/contenttypes dependencies, and any circular dependencies, before touching persistent MySQL. Do not edit previously applied IC-002 migrations.
+4. Use a disposable fresh database for first migration verification; then migrate the approved persistent native MySQL database, repeat migrations to confirm `No migrations to apply`, and verify custom user tables and email uniqueness. Back up or otherwise protect existing local data before schema changes.
+5. If the graph cannot be applied safely, STOP and escalate to SOL/PO. Do not silently fall back to Django's default `auth.User`.
+
+### Mandatory negative tests
+
+- Duplicate email differing only in case is rejected by the actual database constraint.
+- App Admin with IT role `NONE` is denied shared IT document actions; framework superuser alone is likewise denied.
+- All private Web-document/vault access to a different owner is denied for every IT role and every admin flag combination.
+- Inactive and anonymous users are denied by all policy helpers.
+- Role/action matrix, clean and repeated MySQL migrations, and IC-002 health regression pass. Record what was actually executed and any environment limitations.
+
+**Approval gate:** SOL has finalized these five technical recommendations for PO decision. This revision is planning-only. No IC-003 implementation branch, coding, PR, or merge is authorized until separate explicit PO authorization.
 
 ## Verification and TTDM gates
 
