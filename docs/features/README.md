@@ -9,7 +9,7 @@ Maintain **one feature-level record** per approved feature at `docs/features/<fe
 | Feature | Name | Tasks | Status |
 | --- | --- | --- | --- |
 | F-00 | Foundation | IC-001 | Merged under original TTDM workflow; documentation closeout separate |
-| F-01 | Core Platform | IC-002–IC-005 | Not started |
+| F-01 | Core Platform | IC-002–IC-005 | All tasks verified and integrated; [feature acceptance review](F-01-acceptance-review.md) complete; PO release approval pending |
 | F-02 | Identity & Administration | IC-006–IC-008, IC-024 | Not started; IC-024 dependency must be resolved |
 | F-03 | Documentation Management | IC-009–IC-017 | Not started |
 | F-04 | Copilot | IC-018–IC-020 | Not started |

@@ -1,12 +1,12 @@
 # IT Support Copilot
 
-IT Support Copilot is a planned Next.js and Django monorepo. IC-001 establishes repository boundaries, local configuration, and documentation only. Application behavior is not yet implemented; Django/MySQL core work begins in IC-002.
+IT Support Copilot is a Next.js and Django monorepo. IC-002 implements the initial Django/DRF API and native-MySQL health check while preserving the custom-user migration boundary for IC-003.
 
 ## Repository layout
 
 | Path | Ownership |
 | --- | --- |
-| `apps/web` | Next.js, TypeScript, Tailwind CSS, and shadcn/ui frontend (future task) |
+| `apps/web` | Next.js, TypeScript, Tailwind CSS, and shadcn/ui frontend |
 | `apps/api` | Django REST Framework HTTP API (IC-002 and later) |
 | `workers/document_processor` | Separate document-worker entrypoint using shared Django business logic (future task) |
 | `packages/api-contract` | Generated/shared API contract artifacts (future task) |
@@ -20,8 +20,8 @@ Placeholder directories contain a `README.md` so their intended ownership is tra
 
 - Git 2.45 or newer
 - Node.js 22 LTS or 24 LTS and npm 10 or newer (repository validation)
-- Docker Desktop 4.34 or newer with Docker Compose v2 (optional local MySQL)
-- Python 3.12 or 3.13 will be required when the Django project is introduced in IC-002
+- Python 3.12 or 3.13
+- An existing native MySQL installation for API development; Docker Compose remains optional
 
 Windows 11 with PowerShell 7, current macOS, and current Linux distributions are intended development environments. IC-001 was authored on Windows; clean-checkout verification on every platform is still pending.
 
@@ -57,12 +57,22 @@ docker compose ps
 
 Stop it with `docker compose down`. Add `--volumes` only when you intentionally want to erase local database data.
 
+## API setup
+
+Native Windows setup, database account creation, migrations, and startup commands are documented in [apps/api/README.md](apps/api/README.md). Docker is not required.
+
+## Frontend setup
+
+From `apps/web`, run `npm install` and `npm run dev`. Run Django at
+`http://localhost:8000`; the web application uses `http://localhost:3000`.
+See [apps/web/README.md](apps/web/README.md) for test and environment details.
+
 ## Current limitations
 
-- `apps/web`, `apps/api`, the document worker, contracts, and end-to-end tests are boundaries only; they have no runtime yet.
+- Document worker and generated API contracts remain future-task boundaries.
 - Compose defines MySQL only. API and web services must be added by their approved task codes.
 - The database credentials in `.env.example` are deliberately non-production placeholders.
-- There is no authentication, health API, document processing, retrieval, or OpenAI integration in IC-001.
+- Account lifecycle, document processing, retrieval, and OpenAI integration remain future scope.
 
 See the [documentation index](docs/README.md) and [IC-001 verification record](docs/tasks/IC-001/test-results.md).
 
