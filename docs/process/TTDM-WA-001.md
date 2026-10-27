@@ -82,13 +82,13 @@ If the PR head changes after authorization, the merge must be re-reviewed and re
 | --- | --- | --- |
 | F-00 Foundation (historical) | `main` | IC-001 (already merged) |
 | F-01 Core Platform | `feature/core-platform` | IC-002–IC-005 |
-| F-02 Identity & Administration | `feature/identity-administration` | IC-006–IC-008, IC-024 |
+| F-02 Identity & Administration | `feature/identity-administration` | IC-006–IC-008 (PO-approved G0 planning scope, 2026-10-27); IC-024 deferred |
 | F-03 Documentation Management | `feature/documentation-management` | IC-009–IC-017 |
 | F-04 Copilot | `feature/copilot` | IC-018–IC-020 |
 | F-05 Credentials Vault | `feature/credentials-vault` | IC-021–IC-023 |
 | F-06 MVP Acceptance | `feature/mvp-acceptance` | IC-025 |
 
-**Dependency constraint:** IC-024 may depend on later vault behavior. F-02 must not be released until all applicable dependencies are met; a mapping change requires Product Owner approval. This grouping does not authorize any feature or Task Code implementation.
+**Dependency constraint and approved planning amendment (2026-10-27):** Product Owner approved F-02 planning scope IC-006, IC-007, IC-008 and deferred IC-024 until IC-023 is available. IC-024 requires IC-007 and IC-023; its later feature placement and implementation require separate approval. This amendment is a documentation proposal until its governance PR is reviewed and approved for merge. **G0 planning approval does not authorize implementation, task branches, code, or merges.**
 
 ## Review gates
 
