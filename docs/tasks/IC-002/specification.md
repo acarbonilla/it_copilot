@@ -3,68 +3,91 @@
 **Project:** IT Support Copilot V1.0 MVP  
 **Method:** TTDM-WA-001 — feature-based development  
 **Feature:** F-01 Core Platform  
-**Proposed task branch:** `task/IC-002-django-mysql-core` (not created)  
-**Status:** Draft specification — awaiting Product Owner approval to implement  
+**Proposed task branch:** `task/IC-002-django-mysql-core` (**not created**)  
+**Status:** Revised specification — awaiting Product Owner implementation approval  
 **Priority:** P0  
 **Scope authorization:** F-01 scope approved 2026-10-27; **IC-002 implementation is not authorized**.
 
-## Objective
+## Authoritative Product Owner baseline
 
-Initialize the Django/DRF backend inside `apps/api`, connect it to the local MySQL service established by IC-001, and expose a minimal versioned health API that supports repeatable local development and testing. Preserve existing monorepo boundaries.
+The original IC-002 task definition governs this specification:
 
-## Baseline and dependencies
+> **Objective:** Create the backend foundation and persistent relational schema.
+>
+> **Implementation scope:** Configure Django, DRF, MySQL connection, settings separation, structured JSON errors, `/api/v1/health` endpoint, migration tooling.
+>
+> **Acceptance criteria:** Health endpoint returns expected status; database migrations run twice safely; connection failure is handled predictably.
+>
+> **Verification:** Django system checks, migration tests, API health test, database connectivity test.
+>
+> **Dependencies:** IC-001. **Risk:** Initial migration design must precede domain model changes.
 
-- IC-001 merged repository scaffold and local Compose MySQL service.
-- Approved stack: Python 3.12 or 3.13, Django, Django REST Framework, MySQL, Docker Compose for local development.
-- `apps/web`, `workers/document_processor`, `packages/api-contract`, and `tests/e2e` are existing ownership boundaries, not runtime services.
-- The detailed API contract below is **proposed for approval**, not an existing product requirement or implemented endpoint.
+The details below operationalize this baseline; they do not replace it. Any change to the endpoint path or functional scope requires separate Product Owner approval.
 
-## Proposed implementation scope
+## Objective and boundaries
 
-1. Initialize a reproducible Django project and minimal settings structure under `apps/api`; document Python version, pinned dependency strategy, and local commands.
-2. Configure database connectivity via environment variables to the existing local MySQL service; never commit real secrets.
-3. Add DRF and an API route namespace (proposed `/api/v1/`).
-4. Add a liveness endpoint (proposed `GET /api/v1/health/live/`) returning HTTP 200 with a minimal machine-readable status when the API process is running.
-5. Add a readiness endpoint (proposed `GET /api/v1/health/ready/`) that checks MySQL connectivity and returns HTTP 200 when available or HTTP 503 when unavailable, without exposing credentials or internals.
-6. Support initial Django migrations for framework-owned tables and a documented fresh-database initialization.
-7. Provide automated tests for liveness, readiness (database available/unavailable), settings safety, and basic startup; document any environment-dependent test constraints.
-8. Update the root setup instructions, relevant architecture/API docs, and all four IC-002 TTDM records as implementation proceeds.
-9. Keep local development only; avoid AWS, deployment pipelines, hosting, and production infrastructure.
+Initialize the Django/DRF backend in `apps/api`, connect it to the IC-001 local MySQL service, establish an initial persistent relational schema through Django migration tooling, and provide the single required `/api/v1/health` endpoint with predictable failure behavior. Preserve the existing monorepo ownership boundaries.
 
-## Proposed acceptance criteria
+**In scope:**
+1. Reproducible Django and Django REST Framework initialization, dependency/version documentation, and startup commands.
+2. **Settings separation:** explicit common/base settings and local-development settings, with environment-based secrets and database configuration; document selection and safe defaults. Do not commit real secrets.
+3. **MySQL connection:** use IC-001 local Compose configuration; document hostname and port differences between host-run Django and container networking where applicable.
+4. **Structured JSON errors:** define and apply a consistent machine-readable error envelope to IC-002 API failures; ensure no database exception, credential, traceback, or internal connection detail is exposed.
+5. **One health endpoint:** `GET /api/v1/health` (exact path; no replacement with split liveness/readiness endpoints). Define the expected healthy and database-unavailable status codes and JSON responses in the implementation plan and test them.
+6. **Initial schema and migration design:** document framework-owned tables, any IC-002-owned schema, and migration order *before* domain model changes. Do not introduce later-task domain models or preempt IC-003's custom user model design. Record any implications of Django's initial auth migrations for IC-003 and obtain a design decision before migrations that would constrain the custom user model.
+7. Migration tooling, clean database initialization, and safe repeat execution of the migration command.
+8. Django system checks, migration tests, API health test, database connectivity test, and documented reproducible local verification.
+9. Documentation and the four TTDM task records during a later, separately authorized implementation.
 
-| ID | Criterion | Required evidence |
+**Out of scope:** custom user/roles (IC-003), session auth/CSRF (IC-004), Next.js shell/login (IC-005), document processing, Copilot, vault, cloud hosting, deployment, and CI/CD.
+
+## API and error-contract decisions awaiting approval
+
+The endpoint path is fixed by the Product Owner baseline: **`/api/v1/health`**. The baseline does not prescribe exact HTTP status codes, JSON fields, or a database outage response body. To make implementation testable, SOL proposes:
+
+| Condition | Proposed HTTP status | Proposed JSON body |
 | --- | --- | --- |
-| IC-002-AC-01 | Django project starts from documented local setup using supported Python and pinned dependencies. | Fresh-setup commands and captured result |
-| IC-002-AC-02 | Django/DRF settings use environment-supplied secret and MySQL credentials; no real secrets committed. | Settings review, ignore checks |
-| IC-002-AC-03 | Local Django connects to IC-001 MySQL Compose service with documented host/port behavior. | Connectivity and migration output |
-| IC-002-AC-04 | `GET /api/v1/health/live/` returns 200 and minimal JSON when Django is running. | API test |
-| IC-002-AC-05 | `GET /api/v1/health/ready/` returns 200 with MySQL reachable and 503 when unreachable, without leaking details. | Positive and negative tests |
-| IC-002-AC-06 | Fresh-database migrations complete; rerunning migrations is safe. | Migration test/log |
-| IC-002-AC-07 | Automated tests and applicable static/configuration checks pass; exceptions are explicitly documented. | Commands, tool versions, results |
-| IC-002-AC-08 | README and API/architecture documentation reflect implemented behavior only. | Documentation review |
-| IC-002-AC-09 | Diff stays within backend foundation and related local configuration/documentation; later tasks remain untouched. | PR diff review |
-| IC-002-AC-10 | Four task records and SOL review are complete before any authorized task-to-feature merge. | TTDM records and reviewed PR SHA |
+| Django responding and MySQL reachable | `200` | `{"status":"ok"}` |
+| MySQL unreachable or connectivity check fails | `503` | `{"error":{"code":"database_unavailable","message":"Service temporarily unavailable"}}` |
 
-## Security and interface decisions for approval
+For other IC-002 API errors, propose the same envelope: `{"error":{"code":"stable_machine_code","message":"Safe human-readable description"}}`. Exact response schemas and timeout behavior remain **proposals for Product Owner confirmation**, not additions already authorized by the original task definition.
 
-- Health endpoints are proposed to be unauthenticated for local diagnostics, returning no environment details, database errors, stack traces, or secrets.
-- Readiness failure should produce a generic error payload and HTTP 503; detailed failure information stays in local logs.
-- No custom user/roles (IC-003), sessions/CSRF (IC-004), frontend/login (IC-005), document worker, retrieval, vault, or external AI work.
-- No cloud, production deployment, hosting, or CI/CD work.
-- Exact Django/DRF/MySQL driver versions and endpoint payload schemas must be recorded in the implementation plan before code is written and checked for compatibility.
+Health access is proposed to be unauthenticated **for local development only**, with no internal diagnostic information returned. A bounded read-only connectivity check is recommended so failures are predictable; no production exposure is authorized. The health endpoint must not create or mutate database records.
 
-## Proposed verification procedure
+## Acceptance criteria — original requirements preserved and made testable
 
-1. Start MySQL via existing Compose configuration and configure a local, ignored environment file.
-2. Install backend dependencies in an isolated Python environment.
-3. Run Django system checks and migrations against the local MySQL instance.
-4. Run automated tests, including a simulated or controlled MySQL outage for readiness behavior.
-5. Call both health endpoints and capture HTTP status and sanitized response bodies.
-6. Repeat from a clean checkout and record OS, Python, Django, DRF, MySQL, Docker Compose, and commands actually used.
+| ID | Acceptance criterion | Evidence |
+| --- | --- | --- |
+| IC-002-AC-01 | Django and DRF initialize and run using documented supported Python and pinned dependency versions. | Startup and fresh-setup commands/results |
+| IC-002-AC-02 | Settings separation is explicit and working; secrets and MySQL credentials are environment-supplied and ignored by version control. | Settings inspection and safety tests |
+| IC-002-AC-03 | Django connects to local MySQL using documented configuration and can persist the initial relational schema. | Database connectivity and schema/migration evidence |
+| IC-002-AC-04 | The **single** `GET /api/v1/health` endpoint returns the documented expected healthy status and JSON body. | API health test |
+| IC-002-AC-05 | Database connection failure is handled predictably by the health API with documented status and **structured JSON error**, without leaking sensitive internals. | Database-down API and error-schema tests |
+| IC-002-AC-06 | Initial migration design is documented **before domain model changes**; migrations run successfully on a fresh database and can be executed a second time safely. | Design record, first and second migration runs |
+| IC-002-AC-07 | Django system checks, migration tests, API health test, and database connectivity test pass, or limitations are explicitly documented and not accepted as passing. | Commands, versions, actual results |
+| IC-002-AC-08 | README, architecture/API docs, and migration instructions reflect implemented behavior only. | Documentation review |
+| IC-002-AC-09 | Diff is limited to IC-002 backend foundation, initial schema, local configuration, tests, and documentation; no later-task features. | PR diff review |
+| IC-002-AC-10 | All four IC-002 TTDM task records and SOL review are complete before any separately authorized task integration into `feature/core-platform`. | Task records and reviewed PR SHA |
 
-## TTDM delivery and authorization gate
+## Required verification plan
 
-The Product Owner must approve this specification **before** implementation. Upon approval, a separate `task/IC-002-django-mysql-core` branch may be created from `feature/core-platform`. Codex/Cursor supplies code, tests, and the four living documents; SOL reviews acceptance evidence and authorizes a task PR merge into the feature branch. The Product Owner separately authorizes the eventual F-01 merge into `main`.
+1. Run Django system checks with the documented settings configuration.
+2. Start IC-001 MySQL Compose service and verify database connectivity.
+3. Review initial schema/migration design and confirm it does not preempt IC-003's custom user model; record the decision before applying initial migrations.
+4. Apply migrations on a fresh database; run the same migration command again and verify no unsafe changes or errors.
+5. Test `GET /api/v1/health` with MySQL available and unavailable, including HTTP statuses and JSON schemas.
+6. Test structured JSON error responses and verify sensitive error details are absent.
+7. Capture the actual command outputs, tool versions, and clean-checkout instructions. Do not claim tests pass until executed.
 
-**Not authorized by this draft:** implementation, task PR creation/merge, feature release, or changes to `main`.
+## Risks and controls
+
+- **Migration ordering:** Design initial migrations before domain model changes. Django's user model is especially sensitive to initial migration choices; IC-003's custom user model must not be made unnecessarily difficult by IC-002.
+- **Connectivity failures:** Use a bounded check and safe JSON error; do not expose secrets or internal exceptions.
+- **Configuration drift:** Keep settings separation and environment variable selection explicit.
+- **Scope drift:** Do not introduce split health endpoints or later-task functionality without Product Owner approval.
+
+## TTDM authorization gate
+
+The Product Owner approved the **F-01 scope**, not IC-002 implementation. This document is a **specification revision only** on `feature/core-platform`. No IC-002 task branch, code, PR, task integration, or F-01 release is authorized.
+
+Before implementation, the Product Owner must approve this specification, including the proposed HTTP/JSON contract and migration design approach. Only then may a task branch be created for a separately authorized Codex/Cursor handoff. SOL reviews implementation evidence and authorizes task-to-feature integration under TTDM-WA-001; the Product Owner separately approves any F-01 merge into `main`.
