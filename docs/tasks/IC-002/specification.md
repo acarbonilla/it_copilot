@@ -26,12 +26,12 @@ The details below operationalize this baseline; they do not replace it. Any chan
 
 ## Objective and boundaries
 
-Initialize the Django/DRF backend in `apps/api`, connect it to the IC-001 local MySQL service, establish an initial persistent relational schema through Django migration tooling, and provide the single required `/api/v1/health` endpoint with predictable failure behavior. Preserve the existing monorepo ownership boundaries.
+Initialize the Django/DRF backend in `apps/api`, connect it to the Product Owner's existing native MySQL installation on Windows 10, establish an initial persistent relational schema through Django migration tooling, and provide the single required `/api/v1/health` endpoint with predictable failure behavior. Preserve the existing monorepo ownership boundaries.
 
 **In scope:**
 1. Reproducible Django and Django REST Framework initialization, dependency/version documentation, and startup commands.
 2. **Settings separation:** explicit common/base settings and local-development settings, with environment-based secrets and database configuration; document selection and safe defaults. Do not commit real secrets.
-3. **MySQL connection:** use IC-001 local Compose configuration; document hostname and port differences between host-run Django and container networking where applicable.
+3. **MySQL connection:** primary supported development setup is **Windows 10 with MySQL already installed and running natively on the host**, not Docker. Configure Django to connect using environment variables; default guidance may use `127.0.0.1` and port `3306` **only after confirming the actual local MySQL listener/port**. Document dedicated database and least-privilege application user setup; do not use the MySQL `root` account for Django. Preserve IC-001 Docker Compose files as an **optional alternative**; do not require Docker Desktop or WSL for IC-002.
 4. **Structured JSON errors:** define and apply a consistent machine-readable error envelope to IC-002 API failures; ensure no database exception, credential, traceback, or internal connection detail is exposed.
 5. **One health endpoint:** `GET /api/v1/health` (exact path; no replacement with split liveness/readiness endpoints). Define the expected healthy and database-unavailable status codes and JSON responses in the implementation plan and test them.
 6. **Initial schema and migration design:** document framework-owned tables, any IC-002-owned schema, and migration order *before* domain model changes. Do not introduce later-task domain models or preempt IC-003's custom user model design. Record any implications of Django's initial auth migrations for IC-003 and obtain a design decision before migrations that would constrain the custom user model.
@@ -40,6 +40,16 @@ Initialize the Django/DRF backend in `apps/api`, connect it to the IC-001 local 
 9. Documentation and the four TTDM task records during a later, separately authorized implementation.
 
 **Out of scope:** custom user/roles (IC-003), session auth/CSRF (IC-004), Next.js shell/login (IC-005), document processing, Copilot, vault, cloud hosting, deployment, and CI/CD.
+
+## Primary local development environment
+
+- **Operating system:** Product Owner's Windows 10 workstation.
+- **Database:** existing working native MySQL server on the workstation; **no Docker installation is present or required**.
+- **Backend:** local Python virtual environment and Django process on Windows 10.
+- **Connection:** environment-configured MySQL host, port, database name, application username, and password. Verify actual values before testing; `127.0.0.1:3306` is a conventional example, not a verified workstation setting.
+- **Database safety:** create a project-specific database and non-root application account with permissions appropriate for migrations and development; never commit credentials or modify unrelated existing databases.
+- **Optional compatibility:** retain the IC-001 Compose setup without making it a prerequisite. If later used, document any different host/port configuration separately.
+- **Verification limitation:** SOL and Codex must not claim that the Product Owner's local MySQL connectivity or tests passed without actual evidence from that Windows workstation.
 
 ## Finalized API and structured error contract
 
@@ -64,7 +74,7 @@ Before any database migration is applied, record the initial table inventory, de
 | --- | --- | --- |
 | IC-002-AC-01 | Django and DRF initialize and run using documented supported Python and pinned dependency versions. | Startup and fresh-setup commands/results |
 | IC-002-AC-02 | Settings separation is explicit and working; secrets and MySQL credentials are environment-supplied and ignored by version control. | Settings inspection and safety tests |
-| IC-002-AC-03 | Django connects to local MySQL using documented configuration and can persist the initial relational schema. | Database connectivity and schema/migration evidence |
+| IC-002-AC-03 | Django connects to the existing **native Windows 10 MySQL server without Docker**, using documented environment configuration and a dedicated non-root database account, and can persist the initial relational schema. | Windows connectivity and schema/migration evidence |
 | IC-002-AC-04 | The **single** `GET /api/v1/health` endpoint returns the documented expected healthy status and JSON body. | API health test |
 | IC-002-AC-05 | Database connection failure is handled predictably by the health API with documented status and **structured JSON error**, without leaking sensitive internals. | Database-down API and error-schema tests |
 | IC-002-AC-06 | Initial migration design is documented **before domain model changes**; migrations run successfully on a fresh database and can be executed a second time safely. | Design record, first and second migration runs |
@@ -76,7 +86,7 @@ Before any database migration is applied, record the initial table inventory, de
 ## Required verification plan
 
 1. Run Django system checks with the documented settings configuration.
-2. Start IC-001 MySQL Compose service and verify database connectivity.
+2. On Windows 10, verify the existing native MySQL service and actual listening port; configure a dedicated project database/user and verify Django connectivity **without Docker**.
 3. Review initial schema/migration design and confirm it does not preempt IC-003's custom user model; record the decision before applying initial migrations.
 4. Apply migrations on a fresh database; run the same migration command again and verify no unsafe changes or errors.
 5. Test `GET /api/v1/health` with MySQL available and unavailable, including HTTP statuses and JSON schemas.
@@ -87,7 +97,7 @@ Before any database migration is applied, record the initial table inventory, de
 
 - **Migration ordering:** Design initial migrations before domain model changes. Django's user model is especially sensitive to initial migration choices; IC-003's custom user model must not be made unnecessarily difficult by IC-002.
 - **Connectivity failures:** Use a bounded check and safe JSON error; do not expose secrets or internal exceptions.
-- **Configuration drift:** Keep settings separation and environment variable selection explicit.
+- **Configuration drift:** Keep settings separation and environment variable selection explicit; Windows native MySQL is the primary path, while IC-001 Compose remains optional.
 - **Scope drift:** Do not introduce split health endpoints or later-task functionality without Product Owner approval.
 
 ## TTDM authorization gate
