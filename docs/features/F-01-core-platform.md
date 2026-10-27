@@ -1,6 +1,6 @@
 # F-01 — Core Platform
 
-**Status:** In Development — IC-002, IC-003 and IC-004 Verified and integrated
+**Status:** In Development — IC-002 through IC-004 integrated; IC-005 pending SOL review
 **Feature branch:** `feature/core-platform`  
 **Approved base:** `main` at `cfeb19bf541aba962f9733289b905973d26361db`  
 **Product Owner scope approval:** 2026-10-27  
@@ -15,7 +15,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 | [IC-002](../tasks/IC-002/specification.md) | Django/MySQL Core and Health API | Verified; merged into feature branch via PR #5 |
 | [IC-003](../tasks/IC-003/specification.md) | Custom User Model and Roles | Verified; merged into feature branch via PR #6 |
 | [IC-004](../tasks/IC-004/specification.md) | Session Authentication and CSRF | Verified; merged into feature branch via PR #7 |
-| IC-005 | Next.js Shell and Login | Not started |
+| [IC-005](../tasks/IC-005/specification.md) | Next.js Shell and Login | Implemented; pending SOL review |
 
 ## Task verification matrix
 

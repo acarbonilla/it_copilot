@@ -6,7 +6,7 @@ IT Support Copilot is a Next.js and Django monorepo. IC-002 implements the initi
 
 | Path | Ownership |
 | --- | --- |
-| `apps/web` | Next.js, TypeScript, Tailwind CSS, and shadcn/ui frontend (future task) |
+| `apps/web` | Next.js, TypeScript, Tailwind CSS, and shadcn/ui frontend |
 | `apps/api` | Django REST Framework HTTP API (IC-002 and later) |
 | `workers/document_processor` | Separate document-worker entrypoint using shared Django business logic (future task) |
 | `packages/api-contract` | Generated/shared API contract artifacts (future task) |
@@ -61,12 +61,18 @@ Stop it with `docker compose down`. Add `--volumes` only when you intentionally 
 
 Native Windows setup, database account creation, migrations, and startup commands are documented in [apps/api/README.md](apps/api/README.md). Docker is not required.
 
+## Frontend setup
+
+From `apps/web`, run `npm install` and `npm run dev`. Run Django at
+`http://localhost:8000`; the web application uses `http://localhost:3000`.
+See [apps/web/README.md](apps/web/README.md) for test and environment details.
+
 ## Current limitations
 
-- `apps/web`, the document worker, contracts, and end-to-end tests remain future-task boundaries.
+- Document worker and generated API contracts remain future-task boundaries.
 - Compose defines MySQL only. API and web services must be added by their approved task codes.
 - The database credentials in `.env.example` are deliberately non-production placeholders.
-- Authentication, document processing, retrieval, and OpenAI integration remain out of IC-002 scope.
+- Account lifecycle, document processing, retrieval, and OpenAI integration remain future scope.
 
 See the [documentation index](docs/README.md) and [IC-001 verification record](docs/tasks/IC-001/test-results.md).
 
