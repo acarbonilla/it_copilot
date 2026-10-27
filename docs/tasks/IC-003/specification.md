@@ -3,10 +3,10 @@
 **Project:** IT Support Copilot V1.0 MVP  
 **Feature:** F-01 Core Platform  
 **Method:** TTDM-WA-001  
-**Status:** Specification draft — Product Owner review required; implementation not yet authorized  
+**Status:** In Progress — five technical decisions approved and implementation authorized by Product Owner on 2026-10-27
 **Priority:** P0  
 **Dependency:** IC-002 Verified and integrated into `feature/core-platform` via PR #5  
-**Proposed task branch:** `task/IC-003-custom-user-roles` (not created)
+**Task branch:** `task/IC-003-custom-user-roles`
 
 ## Authoritative Product Owner baseline
 
@@ -50,7 +50,7 @@ Application administration and IT documentation administration are separate priv
 | IC-003-AC-07 | IC-002 health API, structured errors and existing contenttypes migrations remain intact. |
 | IC-003-AC-08 | Model, role matrix, negative authorization, system and migration tests are recorded with actual results. |
 
-## SOL-finalized technical design decisions — pending Product Owner approval
+## SOL-finalized and Product Owner-approved technical design decisions
 
 These are implementation design choices derived from the baseline, **not new requirements quoted from the original TTDM document**.
 
@@ -98,12 +98,12 @@ These are implementation design choices derived from the baseline, **not new req
 - Inactive and anonymous users are denied by all policy helpers.
 - Role/action matrix, clean and repeated MySQL migrations, and IC-002 health regression pass. Record what was actually executed and any environment limitations.
 
-**Approval gate:** SOL has finalized these five technical recommendations for PO decision. This revision is planning-only. No IC-003 implementation branch, coding, PR, or merge is authorized until separate explicit PO authorization.
+**Approval gate:** The Product Owner approved all five decisions and authorized IC-003 implementation on 2026-10-27. Task integration still requires SOL approval of the exact PR head.
 
 ## Verification and TTDM gates
 
 - Record a migration inventory/graph before applying any new migrations; confirm IC-002 `contenttypes` state and protect existing data.
 - Run model and uniqueness tests, role matrix and negative authorization tests, Django system checks, clean-database migrations and second-run idempotence, and IC-002 regression tests.
 - Verify native Windows 10 MySQL where available; record limitations rather than claiming unexecuted results.
-- SOL must review the final specification and migration decisions. **No implementation branch, code, PR, or merge is authorized by this planning draft.**
-- After separate Product Owner implementation authorization, create a task branch from current `feature/core-platform`, implement with Codex, and submit a task PR targeting the feature branch. Feature-to-`main` release remains separately gated.
+- SOL must review the implementation and migration evidence before task integration.
+- Submit the existing task branch through a PR targeting `feature/core-platform`. Feature-to-`main` release remains separately gated.

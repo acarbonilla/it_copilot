@@ -11,13 +11,21 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "unsafe-development-only-key")
 DEBUG = False
 ALLOWED_HOSTS = [value.strip() for value in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if value.strip()]
 
-# Auth/admin/sessions stay absent until IC-003 defines the custom user model.
-INSTALLED_APPS = ["django.contrib.contenttypes", "rest_framework", "health"]
+# The custom user model is configured before auth migrations are enabled.
+# Admin and sessions remain out of scope until their owning tasks.
+INSTALLED_APPS = [
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    "rest_framework",
+    "accounts",
+    "health",
+]
 MIDDLEWARE = ["django.middleware.security.SecurityMiddleware", "django.middleware.common.CommonMiddleware"]
 ROOT_URLCONF = "config.urls"
 TEMPLATES = []
 WSGI_APPLICATION = "config.wsgi.application"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "accounts.User"
 USE_TZ = True
 
 REST_FRAMEWORK = {

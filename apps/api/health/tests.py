@@ -56,10 +56,12 @@ class HealthApiTests(SimpleTestCase):
 
 
 class MigrationGuardrailTests(SimpleTestCase):
-    def test_auth_apps_are_not_installed_before_custom_user_model(self):
+    def test_auth_uses_configured_custom_user_model(self):
         from django.conf import settings
 
-        self.assertNotIn("django.contrib.auth", settings.INSTALLED_APPS)
+        self.assertEqual(settings.AUTH_USER_MODEL, "accounts.User")
+        self.assertIn("django.contrib.auth", settings.INSTALLED_APPS)
+        self.assertIn("accounts", settings.INSTALLED_APPS)
         self.assertNotIn("django.contrib.admin", settings.INSTALLED_APPS)
         self.assertNotIn("django.contrib.sessions", settings.INSTALLED_APPS)
 
