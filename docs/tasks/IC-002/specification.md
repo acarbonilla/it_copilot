@@ -3,10 +3,10 @@
 **Project:** IT Support Copilot V1.0 MVP  
 **Method:** TTDM-WA-001 — feature-based development  
 **Feature:** F-01 Core Platform  
-**Proposed task branch:** `task/IC-002-django-mysql-core` (**not created**)  
-**Status:** Technical decisions finalized — awaiting separate Product Owner implementation authorization  
+**Task branch:** `task/IC-002-django-mysql-core`
+**Status:** In Progress — implementation authorized by Product Owner on 2026-10-27
 **Priority:** P0  
-**Scope authorization:** F-01 scope approved 2026-10-27; **IC-002 implementation is not authorized**.
+**Scope authorization:** F-01 scope and IC-002 implementation approved 2026-10-27.
 
 ## Authoritative Product Owner baseline
 
@@ -102,6 +102,6 @@ Before any database migration is applied, record the initial table inventory, de
 
 ## TTDM authorization gate
 
-The Product Owner approved the **F-01 scope**, not IC-002 implementation. This document is a **specification revision only** on `feature/core-platform`. No IC-002 task branch, code, PR, task integration, or F-01 release is authorized.
+The Product Owner authorized IC-002 implementation on 2026-10-27 and directed work on `task/IC-002-django-mysql-core` with a PR targeting `feature/core-platform`.
 
-The health HTTP/JSON contract and migration design guardrail are finalized in this specification. **Separate explicit Product Owner authorization is still required before implementation or task branch creation.** Only then may a task branch be created for a separately authorized Codex/Cursor handoff. SOL reviews implementation evidence and authorizes task-to-feature integration under TTDM-WA-001; the Product Owner separately approves any F-01 merge into `main`.
+The health HTTP/JSON contract and migration design guardrail are finalized in this specification. SOL reviews implementation evidence and authorizes task-to-feature integration under TTDM-WA-001; the Product Owner separately approves any F-01 merge into `main`.

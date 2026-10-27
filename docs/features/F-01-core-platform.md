@@ -1,6 +1,6 @@
 # F-01 — Core Platform
 
-**Status:** Planned — scope approved; IC-002 implementation awaiting separate approval  
+**Status:** In Development — IC-002 in review
 **Feature branch:** `feature/core-platform`  
 **Approved base:** `main` at `cfeb19bf541aba962f9733289b905973d26361db`  
 **Product Owner scope approval:** 2026-10-27  
@@ -12,7 +12,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 
 | Task | Objective | Current state |
 | --- | --- | --- |
-| [IC-002](../tasks/IC-002/specification.md) | Django/MySQL Core and Health API | Specification drafted; implementation not authorized |
+| [IC-002](../tasks/IC-002/specification.md) | Django/MySQL Core and Health API | Implemented on task branch; SOL review pending |
 | IC-003 | Custom User Model and Roles | Not started |
 | IC-004 | Session Authentication and CSRF | Not started |
 | IC-005 | Next.js Shell and Login | Not started |
@@ -38,8 +38,8 @@ Not yet required: none of the risky integrations or feature release gates has oc
 
 ## SOL recommendation and Product Owner decision
 
-- F-01 scope authorized, but no implementation or merge authorization is implied.
-- IC-002 specification requires separate Product Owner approval.
+- F-01 scope and IC-002 implementation were authorized on 2026-10-27.
+- No task-to-feature or feature-to-main merge authorization is implied.
 - Task-to-feature merges require SOL approval; feature-to-`main` release requires separate Product Owner approval against the exact head SHA.
 
 ## Merge and closeout
