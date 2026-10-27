@@ -4,7 +4,7 @@
 **Method:** TTDM-WA-001 — feature-based development  
 **Feature:** F-01 Core Platform  
 **Proposed task branch:** `task/IC-002-django-mysql-core` (**not created**)  
-**Status:** Revised specification — awaiting Product Owner implementation approval  
+**Status:** Technical decisions finalized — awaiting separate Product Owner implementation authorization  
 **Priority:** P0  
 **Scope authorization:** F-01 scope approved 2026-10-27; **IC-002 implementation is not authorized**.
 
@@ -41,18 +41,22 @@ Initialize the Django/DRF backend in `apps/api`, connect it to the IC-001 local 
 
 **Out of scope:** custom user/roles (IC-003), session auth/CSRF (IC-004), Next.js shell/login (IC-005), document processing, Copilot, vault, cloud hosting, deployment, and CI/CD.
 
-## API and error-contract decisions awaiting approval
+## Finalized API and structured error contract
 
-The endpoint path is fixed by the Product Owner baseline: **`/api/v1/health`**. The baseline does not prescribe exact HTTP status codes, JSON fields, or a database outage response body. To make implementation testable, SOL proposes:
+The endpoint path is fixed by the Product Owner baseline: **`/api/v1/health`**. The baseline does not prescribe exact HTTP status codes, JSON fields, or a database outage response body. The following contract is the specification decision for implementation and testing:
 
-| Condition | Proposed HTTP status | Proposed JSON body |
+| Condition | HTTP status | JSON body |
 | --- | --- | --- |
 | Django responding and MySQL reachable | `200` | `{"status":"ok"}` |
 | MySQL unreachable or connectivity check fails | `503` | `{"error":{"code":"database_unavailable","message":"Service temporarily unavailable"}}` |
 
-For other IC-002 API errors, propose the same envelope: `{"error":{"code":"stable_machine_code","message":"Safe human-readable description"}}`. Exact response schemas and timeout behavior remain **proposals for Product Owner confirmation**, not additions already authorized by the original task definition.
+For other IC-002 API errors, use the same envelope: `{"error":{"code":"stable_machine_code","message":"Safe human-readable description"}}`. These response bodies and status codes are finalized for this specification. The database check must have a finite, documented timeout; the implementation agent will choose and document the exact limit for SOL review.
 
-Health access is proposed to be unauthenticated **for local development only**, with no internal diagnostic information returned. A bounded read-only connectivity check is recommended so failures are predictable; no production exposure is authorized. The health endpoint must not create or mutate database records.
+Health access is unauthenticated **for local development only**, with no internal diagnostic information returned. Use a bounded, read-only connectivity check so failures are predictable; no production exposure is authorized. The health endpoint must not create or mutate database records.
+
+## Finalized initial schema and migration design decision
+
+Before any database migration is applied, record the initial table inventory, dependency graph, and migration sequence. **Do not apply Django's default auth/user migrations in IC-002 in a way that locks in the default User model.** IC-003 owns the custom user model, which must be established in its app's initial migration before the first auth-related migration in any shared or persistent development database. IC-002 must demonstrate repeatable migration execution on a compatible clean database without preempting IC-003; if this cannot be achieved without auth migrations, stop and escalate the sequencing decision to the Product Owner rather than silently using the default User model. No IC-003 user/role code is authorized as part of IC-002.
 
 ## Acceptance criteria — original requirements preserved and made testable
 
@@ -90,4 +94,4 @@ Health access is proposed to be unauthenticated **for local development only**, 
 
 The Product Owner approved the **F-01 scope**, not IC-002 implementation. This document is a **specification revision only** on `feature/core-platform`. No IC-002 task branch, code, PR, task integration, or F-01 release is authorized.
 
-Before implementation, the Product Owner must approve this specification, including the proposed HTTP/JSON contract and migration design approach. Only then may a task branch be created for a separately authorized Codex/Cursor handoff. SOL reviews implementation evidence and authorizes task-to-feature integration under TTDM-WA-001; the Product Owner separately approves any F-01 merge into `main`.
+The health HTTP/JSON contract and migration design guardrail are finalized in this specification. **Separate explicit Product Owner authorization is still required before implementation or task branch creation.** Only then may a task branch be created for a separately authorized Codex/Cursor handoff. SOL reviews implementation evidence and authorizes task-to-feature integration under TTDM-WA-001; the Product Owner separately approves any F-01 merge into `main`.
