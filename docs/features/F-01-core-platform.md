@@ -1,10 +1,10 @@
 # F-01 — Core Platform
 
-**Status:** In Development — IC-002 through IC-004 integrated; IC-005 pending SOL review
+**Status:** All four F-01 tasks Verified and integrated — feature release review pending
 **Feature branch:** `feature/core-platform`  
 **Approved base:** `main` at `cfeb19bf541aba962f9733289b905973d26361db`  
 **Product Owner scope approval:** 2026-10-27  
-**SOL review:** IC-002, IC-003 and IC-004 PASS; IC-005 pending
+**SOL review:** IC-002, IC-003, IC-004 and IC-005 PASS
 
 ## Scope and dependencies
 
@@ -15,7 +15,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 | [IC-002](../tasks/IC-002/specification.md) | Django/MySQL Core and Health API | Verified; merged into feature branch via PR #5 |
 | [IC-003](../tasks/IC-003/specification.md) | Custom User Model and Roles | Verified; merged into feature branch via PR #6 |
 | [IC-004](../tasks/IC-004/specification.md) | Session Authentication and CSRF | Verified; merged into feature branch via PR #7 |
-| [IC-005](../tasks/IC-005/specification.md) | Next.js Shell and Login | Implemented; pending SOL review |
+| [IC-005](../tasks/IC-005/specification.md) | Next.js Shell and Login | Verified; merged into feature branch via PR #8 |
 
 ## Task verification matrix
 
@@ -24,7 +24,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 | IC-002 | [#5](https://github.com/acarbonilla/it_copilot/pull/5) | PASS at `35722ac047a6ba32d2eab4940108971db11650cc` | Yes | `1ad9dcaaa8c0002155311e9aabed68a0838df935` |
 | IC-003 | [#6](https://github.com/acarbonilla/it_copilot/pull/6) | PASS at `e79bcec6067e04623401be7b2c724d54fac98e53` | Yes | `5dec944fea94c3f6433cd4c7fd1018d317504198` |
 | IC-004 | [#7](https://github.com/acarbonilla/it_copilot/pull/7) | PASS at `c37151292b5ec9a2ecb9e87a2765196dd09b08c9` | Yes | `20bdc4e83b24f5de3ddc9a8f4455dcc3c5bedf6c` |
-| IC-005 | [#8](https://github.com/acarbonilla/it_copilot/pull/8) | Pending | No | — |
+| IC-005 | [#8](https://github.com/acarbonilla/it_copilot/pull/8) | PASS at `7073d54fe0d0ce985e0b062f4cdbb306804479f8` | Yes | `98d6c28ce48632d4413d10ef80eb3b85cb9ec295` |
 
 Each Task Code requires its four TTDM records and its own authorized implementation and SOL-reviewed integration gate.
 
@@ -56,3 +56,9 @@ PR #6 custom User/role-policy integration was SOL-reviewed at exact head `e79bce
 ## IC-004 integration checkpoint (2026-10-27)
 
 PR #7 session authentication/CSRF was SOL-reviewed at exact head `c37151292b5ec9a2ecb9e87a2765196dd09b08c9` and merged into the feature branch as `20bdc4e83b24f5de3ddc9a8f4455dcc3c5bedf6c`. Verification evidence in [IC-004 test results](../tasks/IC-004/test-results.md) records 45/45 combined tests, native MySQL session migration, CSRF/Origin negatives, deactivation/logout cookie replay denial, and cookie-aware local HTTP verification. No GitHub Actions CI was available; SOL did not independently execute workstation tests. F-01 remains in development with IC-005 outstanding; no feature-to-`main` authorization is implied.
+
+## IC-005 integration checkpoint (2026-10-27)
+
+PR #8 Next.js shell/login integration was SOL-reviewed at exact head `7073d54fe0d0ce985e0b062f4cdbb306804479f8` and merged into feature branch as `98d6c28ce48632d4413d10ef80eb3b85cb9ec295`. Verification evidence in [IC-005 test results](../tasks/IC-005/test-results.md) records 17/17 frontend API/component tests, 1/1 real two-tab Edge browser E2E, 45/45 backend regressions, typecheck/lint/build, and native MySQL checks. SOL reviewed code and recorded evidence, did not independently execute local tests; GitHub Actions CI unavailable.
+
+**All IC-002 through IC-005 task integrations are complete.** F-01 requires separate feature-level review and explicit Product Owner approval of exact feature head before merge to `main`.
