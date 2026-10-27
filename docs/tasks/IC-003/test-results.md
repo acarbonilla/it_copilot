@@ -42,5 +42,19 @@
 | IC-002 failure/renderer/timeout regressions | Passed as part of the 26-test suite |
 | Repository validation | Passed |
 
+## IC-003-REV-01
+
+- Empty email authentication returns `None` without an exception.
+- Whitespace-only email authentication returns `None` without an exception.
+- Empty and whitespace-only account creation remain strictly rejected.
+- Full `accounts health` suite: 29/29 tests passed.
+- Fresh isolated migration passed; immediate repeat reported
+  `No migrations to apply`; isolated `migrate --check` passed.
+- `makemigrations --check --dry-run`: passed with no model drift.
+- Native database system check and `migrate --check`: passed.
+- Live IC-002 health regression: HTTP 200, `application/json`, exact body
+  `{"status":"ok"}`.
+- Repository validation and diff whitespace check: passed.
+
 No credentials were printed or committed. The backup is under the ignored
 `tmp/` directory and is not an off-machine disaster-recovery backup.

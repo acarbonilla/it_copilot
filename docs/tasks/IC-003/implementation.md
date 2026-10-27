@@ -36,3 +36,10 @@ isolated database before native MySQL migration.
 Native migration then succeeded and repeated safely. MySQL confirmed a
 case-insensitive email collation and rejected a raw case-only duplicate through
 the unique index. No default-user table was created.
+
+## IC-003-REV-01 correction
+
+Blank and whitespace-only authentication identities now produce the model's
+normal `DoesNotExist` lookup result, allowing Django's authentication backend
+to return `None` without leaking a `ValueError`. Account creation continues to
+use strict canonicalization and rejects blank email values with `ValueError`.

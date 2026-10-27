@@ -34,7 +34,11 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
     def get_by_natural_key(self, username):
-        return self.get(email=canonicalize_email(username))
+        try:
+            email = canonicalize_email(username)
+        except ValueError as exc:
+            raise self.model.DoesNotExist from exc
+        return self.get(email=email)
 
 
 class User(AbstractBaseUser, PermissionsMixin):

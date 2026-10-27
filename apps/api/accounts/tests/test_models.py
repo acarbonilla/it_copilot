@@ -31,6 +31,18 @@ class UserModelTests(TestCase):
         self.assertEqual(User.objects.get_by_natural_key(" LOGIN@EXAMPLE.COM "), user)
         self.assertEqual(authenticate(email=" LOGIN@EXAMPLE.COM ", password="password"), user)
 
+    def test_empty_email_authentication_returns_none(self):
+        self.assertIsNone(authenticate(email="", password="password"))
+
+    def test_whitespace_email_authentication_returns_none(self):
+        self.assertIsNone(authenticate(email="   ", password="password"))
+
+    def test_user_creation_still_rejects_blank_email(self):
+        for email in ("", "   "):
+            with self.subTest(email=repr(email)):
+                with self.assertRaises(ValueError):
+                    User.objects.create_user(email, "password")
+
     def test_create_superuser_keeps_application_privileges_independent(self):
         user = User.objects.create_superuser("root@example.com", "password")
         self.assertTrue(user.is_staff)
