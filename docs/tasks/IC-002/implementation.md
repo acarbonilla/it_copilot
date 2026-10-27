@@ -1,9 +1,10 @@
 # IC-002 implementation
 
-**Status:** In Progress  
+**Status:** In Review  
 **Branch:** `task/IC-002-django-mysql-core`  
 **Target:** `feature/core-platform`  
 **Authorization:** Product Owner request, 2026-10-27
+**Pull request:** [#5](https://github.com/acarbonilla/it_copilot/pull/5)
 
 ## Implemented scope
 

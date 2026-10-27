@@ -3,7 +3,7 @@
 | Task | Title | Implementation state | Approval state |
 | --- | --- | --- | --- |
 | [IC-001](IC-001/specification.md) | Monorepo and Local Developer Setup | Merged into `main` via [PR #1](https://github.com/acarbonilla/it_copilot/pull/1), commit [`1cc1609a`](https://github.com/acarbonilla/it_copilot/commit/1cc1609a017dc25687b81163a04914292ed5b101) | SOL passed; Product Owner accepted; documentation closeout [PR #2](https://github.com/acarbonilla/it_copilot/pull/2) pending merge |
-| [IC-002](IC-002/specification.md) | Django/MySQL Core and Health API | In progress | Implementation authorized 2026-10-27; SOL review pending |
+| [IC-002](IC-002/specification.md) | Django/MySQL Core and Health API | In review ([PR #5](https://github.com/acarbonilla/it_copilot/pull/5)) | SOL review pending |
 
 ## TTDM workflow amendment
 

@@ -21,7 +21,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 
 | Task | Task PR | SOL review | Task Verified | Integration commit |
 | --- | --- | --- | --- | --- |
-| IC-002 | Not created | Pending | No | — |
+| IC-002 | [#5](https://github.com/acarbonilla/it_copilot/pull/5) | Pending | No | — |
 | IC-003 | Not created | Pending | No | — |
 | IC-004 | Not created | Pending | No | — |
 | IC-005 | Not created | Pending | No | — |
