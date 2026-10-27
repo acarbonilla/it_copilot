@@ -64,3 +64,17 @@ server at `http://localhost:8000` and native MySQL, with Origin
 An unlabeled `manage.py test` invocation from the monorepo root discovered zero
 tests and is not counted as evidence. The explicit app-label command above is
 the recorded complete Django suite.
+
+## IC-004-REV-01
+
+- CSRF-valid top-level JSON array, null, string, number, and boolean payloads
+  each returned exact structured `400 invalid_request` responses.
+- CSRF-valid syntactically malformed JSON returned structured
+  `400 parse_error`.
+- Responses contained no traceback or `AttributeError` details and none
+  returned HTTP 500.
+- Full `session_auth accounts health` suite: 45/45 tests passed.
+- Django system check, isolated/native `migrate --check`, and model drift check
+  passed.
+- Live native IC-002 health regression remained HTTP 200 with exact JSON.
+- Repository validation and diff whitespace check passed.

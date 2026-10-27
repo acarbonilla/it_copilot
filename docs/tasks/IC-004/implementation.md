@@ -35,3 +35,11 @@ The isolated graph passed first and repeated runs. A private ignored native
 backup was created, then `sessions.0001_initial` was applied to MySQL and
 immediately repeated with no pending migration. Existing user count remained
 unchanged.
+
+## IC-004-REV-01 correction
+
+`LoginView` now verifies that DRF's parsed request body implements `Mapping`
+before reading fields. Valid JSON arrays, null, strings, numbers, and booleans
+receive the existing structured `400 invalid_request` response. Syntactically
+malformed JSON continues through DRF's structured `400 parse_error` path. CSRF
+validation still runs before payload processing.

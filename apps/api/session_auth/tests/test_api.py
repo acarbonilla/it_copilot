@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.contrib.sessions.models import Session
 from django.test import Client, TestCase, override_settings
@@ -132,6 +134,40 @@ class SessionAuthApiTests(TestCase):
             self.assertEqual(response.status_code, 403)
             self.assertEqual(response.json(), {"error": {"code": "csrf_failed", "message": "CSRF validation failed"}})
             self.assertEqual(response.headers["Content-Type"], "application/json")
+
+    def test_csrf_valid_non_object_json_login_payloads_return_safe_400(self):
+        token = self.csrf_token()
+        for payload in ([], None, "email", 42, True):
+            response = self.client.post(
+                "/api/v1/auth/login",
+                json.dumps(payload),
+                content_type="application/json",
+                HTTP_X_CSRFTOKEN=token,
+                HTTP_ORIGIN=FRONTEND_ORIGIN,
+            )
+            with self.subTest(payload=payload):
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.json(),
+                    {"error": {"code": "invalid_request", "message": "Email and password are required"}},
+                )
+                self.assertEqual(response.headers["Content-Type"], "application/json")
+                self.assertNotIn("AttributeError", response.content.decode())
+                self.assertNotIn("traceback", response.content.decode().lower())
+
+    def test_csrf_valid_malformed_json_returns_safe_structured_400(self):
+        token = self.csrf_token()
+        response = self.client.post(
+            "/api/v1/auth/login",
+            "{",
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+            HTTP_ORIGIN=FRONTEND_ORIGIN,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "parse_error")
+        self.assertEqual(response.headers["Content-Type"], "application/json")
+        self.assertNotIn("traceback", response.content.decode().lower())
 
     def test_missing_and_invalid_csrf_rejected_on_logout(self):
         self.assertEqual(self.login().status_code, 200)

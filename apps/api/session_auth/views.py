@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
@@ -37,6 +39,9 @@ class LoginView(APIView):
     permission_classes = []
 
     def post(self, request):
+        if not isinstance(request.data, Mapping):
+            return Response({"error": {"code": "invalid_request", "message": "Email and password are required"}}, status=400)
+
         email = request.data.get("email")
         password = request.data.get("password")
         if not isinstance(email, str) or not isinstance(password, str):
