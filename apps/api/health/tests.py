@@ -1,6 +1,8 @@
+import os
 from unittest.mock import patch
 
-from django.db import DatabaseError
+from django.core.exceptions import ImproperlyConfigured
+from django.db import DatabaseError, OperationalError
 from django.test import SimpleTestCase
 from rest_framework.test import APIClient
 
@@ -26,6 +28,22 @@ class HealthApiTests(SimpleTestCase):
         self.assertEqual(response.json(), {"error": {"code": "database_unavailable", "message": "Service temporarily unavailable"}})
         self.assertNotIn("secret", response.content.decode())
 
+    @patch("health.views.connections")
+    def test_health_returns_safe_503_when_database_read_times_out(self, connections):
+        connections.__getitem__.return_value.cursor.side_effect = OperationalError("read timed out: password=secret")
+        response = self.client.get("/api/v1/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"error": {"code": "database_unavailable", "message": "Service temporarily unavailable"}})
+        self.assertNotIn("timed out", response.content.decode())
+        self.assertNotIn("secret", response.content.decode())
+
+    @patch("health.views.connections")
+    def test_html_accept_header_returns_json_without_template_rendering(self, connections):
+        response = self.client.get("/api/v1/health", HTTP_ACCEPT="text/html")
+        self.assertEqual(response.status_code, 406)
+        self.assertEqual(response.headers["Content-Type"], "application/json")
+        self.assertEqual(response.json(), {"error": {"code": "not_acceptable", "message": "Could not satisfy the request Accept header."}})
+
     def test_health_rejects_unsupported_method_with_structured_error(self):
         response = self.client.post("/api/v1/health")
         self.assertEqual(response.status_code, 405)
@@ -50,3 +68,18 @@ class MigrationGuardrailTests(SimpleTestCase):
 
         self.assertEqual(len(urlpatterns), 1)
         self.assertEqual(str(urlpatterns[0].pattern), "api/v1/health")
+
+    def test_mysql_network_timeouts_are_finite(self):
+        from config.settings import local
+
+        options = local.DATABASES["default"]["OPTIONS"]
+        for timeout in ("connect_timeout", "read_timeout", "write_timeout"):
+            self.assertIsInstance(options[timeout], int)
+            self.assertGreater(options[timeout], 0)
+
+    def test_non_positive_mysql_timeout_is_rejected(self):
+        from config.settings.local import positive_timeout
+
+        with patch.dict(os.environ, {"MYSQL_READ_TIMEOUT": "0"}):
+            with self.assertRaisesMessage(ImproperlyConfigured, "MYSQL_READ_TIMEOUT must be a positive integer"):
+                positive_timeout("MYSQL_READ_TIMEOUT")
