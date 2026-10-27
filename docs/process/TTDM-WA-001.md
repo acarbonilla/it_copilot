@@ -7,7 +7,7 @@
 
 ## Purpose and authority
 
-Individual Task Codes are implemented and reviewed separately, but related tasks integrate into a feature branch. Only a complete, accepted feature is eligible to merge into `main`.
+Individual Task Codes are implemented and reviewed separately. Related tasks integrate into a feature branch; only a complete, accepted feature is eligible to merge into `main`. A small, independent, low-risk standalone task may instead use the controlled direct-to-main PR exception below. Neither route permits direct pushes to `main`.
 
 - **Product Owner:** authorizes feature scope and each Task Code specification; explicitly approves feature-to-`main` merges against an exact PR head.
 - **SOL:** reviews task acceptance evidence and authorizes task-to-feature merges; verifies integration, security, regression, and recovery evidence; recommends feature acceptance.
@@ -19,7 +19,8 @@ Individual Task Codes are implemented and reviewed separately, but related tasks
 | --- | --- | --- | --- |
 | Stable approved baseline | `main` | — | — |
 | Feature integration | `feature/<feature-slug>` | approved `main` | `main` |
-| Single Task Code | `task/IC-NNN-<slug>` | relevant feature commit | corresponding feature |
+| Feature Task Code | `task/IC-NNN-<slug>` | relevant feature commit | corresponding feature |
+| Standalone Task Code | `task/IC-NNN-<slug>` | approved `main` | `main` (exception only) |
 | Recovery checkpoint | `backup/<feature-slug>/<checkpoint-id>` | exact verified feature SHA | never merge directly |
 | Governance/docs | `docs/<slug>` | approved `main` | `main` |
 | Narrow maintenance | `fix/<slug>` | approved `main` | `main` |
@@ -30,7 +31,7 @@ Use lowercase hyphenated slugs, stable Task Codes, unique checkpoint IDs, and ex
 
 `New → Planned → In Progress → In Review → Task Verified`
 
-A task is **Task Verified** only after its approved acceptance criteria, tests and exceptions, SOL review, and four living documents are complete, and its task PR has been authorized by SOL and merged into the correct feature branch. Task Verified does **not** mean deployed, merged into `main`, or feature-complete.
+A feature-scoped task is **Task Verified** only after its approved acceptance criteria, tests and exceptions, SOL review, and four living documents are complete, and its task PR has been authorized by SOL and merged into the correct feature branch. Task Verified does **not** mean deployed, merged into `main`, or feature-complete. A standalone task follows the separate completion gate below.
 
 Required per-task records:
 - `docs/tasks/IC-NNN/specification.md`
@@ -39,6 +40,26 @@ Required per-task records:
 - `docs/tasks/IC-NNN/review.md`
 
 Task PR merge permission is SOL-approved following review; Product Owner retains prior authorization of the Task Code scope.
+
+## Section 3A — Standalone Task Fast Track (controlled exception)
+
+A task may bypass the feature integration branch **only** when all of the following are documented:
+1. The change is independently useful and does not depend on unmerged feature work.
+2. Scope is small, bounded, low-risk, and independently testable.
+3. It does not introduce material authentication, authorization, encryption, sensitive-data, schema-migration, architectural, or cross-feature integration risk.
+4. SOL confirms no adverse effect on active feature branches and recommends the standalone classification.
+5. The Product Owner **explicitly authorizes the standalone classification and task scope** before implementation.
+
+**Flow:** `main` → `task/IC-NNN-<slug>` → reviewed task PR targeting `main` → Product Owner-approved merge → verified closeout.
+
+- Codex implements only the approved scope and records acceptance criteria, tests, and all four task documents.
+- SOL reviews the exact PR head, validates the evidence, and recommends acceptance.
+- **The Product Owner explicitly approves the exact standalone PR head SHA before merging into `main`.** SOL's normal authority to merge tasks into feature branches does not extend to merging standalone tasks into `main`.
+- If the PR head changes, approval must be renewed; no direct push or bypass of PR review is allowed.
+- After successful merge, record the merge SHA and documentation closeout; the task is **Completed (Standalone)**, not Feature Completed.
+- If a change proves interdependent or risky, stop and reclassify it into a feature through Product Owner approval.
+
+Examples that *may* qualify after assessment: a README correction, isolated validation-script improvement, or small independent UI fix. A small diff alone does not establish low risk. Existing IC-001 history remains unchanged.
 
 ## Feature lifecycle and gate
 
@@ -77,6 +98,8 @@ If the PR head changes after authorization, the merge must be re-reviewed and re
 | G1 Task specification | Acceptance criteria, bounded scope | Product Owner |
 | G2 Task review | Code, tests, four living docs | SOL |
 | G3 Task PR → feature | Exact reviewed task PR head and target | SOL |
+| G3S Standalone classification | Independence, risk assessment, bounded scope | SOL recommends; Product Owner authorizes |
+| G5S Standalone PR → main | Exact head SHA, task tests/docs, SOL recommendation | Product Owner |
 | G4 Feature integration | Regression/security checks, recovery checkpoint, feature record | SOL |
 | G5 Feature PR → main | Exact head SHA, SOL recommendation | Product Owner |
 | G6 Closeout | Merge SHA and living-documentation evidence | SOL verifies; Product Owner accepts |
