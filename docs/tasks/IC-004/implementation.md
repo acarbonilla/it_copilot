@@ -1,9 +1,10 @@
 # IC-004 implementation
 
-**Status:** Ready for PR
+**Status:** In Review
 **Branch:** `task/IC-004-session-auth-csrf`  
 **Target:** `feature/core-platform`  
 **Authorization:** Product Owner approval of the API contract and S-01 through S-05, 2026-10-27
+**Pull request:** [#7](https://github.com/acarbonilla/it_copilot/pull/7)
 
 ## Implemented scope
 
