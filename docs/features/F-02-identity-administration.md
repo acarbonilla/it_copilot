@@ -1,6 +1,6 @@
 # F-02 — Identity & Administration
 
-**Status:** Planned — G0 approved, G1 specifications pending  
+**Status:** Planned — G0 approved; IC-008 G1 design approved, documentation PR review pending  
 **Proposed branch:** `feature/identity-administration` (not created)  
 **Product Owner G0 authorization:** 2026-10-27 — planning only  
 **SOL reviewer:** SOL  
@@ -31,7 +31,7 @@
 
 | Task | G1 specification | Implementation | SOL review | Task Verified |
 | --- | --- | --- | --- | --- |
-| IC-008 | [Draft](../tasks/IC-008/specification.md) — PO approval pending | Not authorized | Pending | No |
+| IC-008 | [G1 design approved; specification finalized for documentation review](../tasks/IC-008/specification.md) | Not authorized | Pending | No |
 | IC-006 | Not drafted | Not authorized | Pending | No |
 | IC-007 | Not drafted | Not authorized | Pending | No |
 | IC-024 | Deferred pending IC-023 | Not authorized | Not applicable | No |
@@ -59,3 +59,7 @@ G0 scope approved for planning. Prepare IC-008 G1 specification, then IC-006 and
 - Target: `main` eventually; no feature PR.
 - Feature merge SHA: None.
 - Feature Completed: **No**.
+
+## IC-008 G1 decision (2026-10-27)
+
+Product Owner approved IC-008 G1 recommendations for immutable nonsecret actor IDs, fail-closed atomic audit on critical mutations, bounded best-effort denied-event logging, controlled versionable event vocabulary, retention-before-cleanup, and default exclusion of email/IP/secrets/raw payloads. Authorized **specification documentation finalization only**. No implementation, task coding, or merge authorized. Draft documentation PR #10 remains subject to separate review and merge authorization.
