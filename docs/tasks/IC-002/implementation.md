@@ -1,6 +1,6 @@
 # IC-002 implementation
 
-**Status:** In Review  
+**Status:** In Review
 **Branch:** `task/IC-002-django-mysql-core`  
 **Target:** `feature/core-platform`  
 **Authorization:** Product Owner request, 2026-10-27
