@@ -30,3 +30,11 @@ Native MySQL uses the case-insensitive `utf8mb4_0900_ai_ci` collation for
 `accounts_user.email` plus a unique index. A raw-SQL duplicate differing only
 in case was rejected with MySQL error 1062 and rolled back.
 
+IC-004 enables Django's database session backend. Its only schema addition is
+the framework-owned `django_session` table from `sessions.0001_initial`. The
+sessions migration has no dependencies and does not alter `accounts_user`,
+auth tables, or prior migration files. Session rows store server-side session
+state; logout deletes the current row. Account deactivation blocks the next
+authenticated request through a fresh user lookup but does not bulk-delete
+historical rows, which remains IC-007 scope.
+

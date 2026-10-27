@@ -3,10 +3,10 @@
 **Project:** IT Support Copilot V1.0 MVP  
 **Feature:** F-01 Core Platform  
 **Method:** TTDM-WA-001  
-**Status:** Specification draft — SOL security-design proposal; Product Owner approval pending  
+**Status:** In Progress — API contract and S-01 through S-05 approved; implementation authorized by Product Owner on 2026-10-27
 **Priority:** P0  
 **Dependency:** IC-003 Verified and integrated via PR #6  
-**Proposed task branch:** `task/IC-004-session-auth-csrf` (not created)
+**Task branch:** `task/IC-004-session-auth-csrf`
 
 ## Authoritative Product Owner baseline (TTDM Development Specification)
 
@@ -18,7 +18,7 @@
 
 Additional source requirements: Django session authentication with CSRF protection; secure cookie settings appropriate to execution context; deactivation invalidates access immediately. IC-005 owns the frontend login UI; IC-006/IC-007 own invitation, activation and account lifecycle.
 
-## Proposed API contract — for PO approval
+## Approved API contract
 
 All paths are under `/api/v1`. Preserve IC-002 `GET /api/v1/health` unchanged.
 
@@ -31,7 +31,7 @@ All paths are under `/api/v1`. Preserve IC-002 `GET /api/v1/health` unchanged.
 
 Proposed success statuses: CSRF bootstrap `200`; login `200`; logout `204`; current-user `200`. Proposed failure statuses: bad credentials `401` generic; missing/inactive session `401`; missing/invalid CSRF `403`; invalid request `400`; unsupported method `405`. Use existing structured JSON errors. These exact paths/statuses are design proposals, not verbatim source requirements.
 
-## Proposed security decisions — require PO approval
+## Approved security decisions
 
 ### S-01 — Django sessions and authenticated identity
 
@@ -89,10 +89,10 @@ Proposed success statuses: CSRF bootstrap `200`; login `200`; logout `204`; curr
 - Document/vault models, permission enforcement in future domain services, audit subsystem.
 - Production deployment, cloud services, hosting and CI/CD pipelines.
 
-## Open approval questions
+## Approved decisions
 
-1. Approve the proposed four endpoint paths and status codes, including `GET /auth/csrf` bootstrap?
-2. Approve local browser topology using `localhost:3000` and `localhost:8000` as the initial test pairing, with exact-origin configuration if required?
-3. Approve S-01 through S-05 and the distinction between immediate deactivation access denial (IC-004) and bulk session-row cleanup (IC-007)?
+1. The four endpoint paths and status codes, including `GET /auth/csrf`, are approved.
+2. The local browser topology uses `localhost:3000` and `localhost:8000` with exact-origin credentialed CORS.
+3. S-01 through S-05 and the boundary between immediate deactivation denial and IC-007 bulk session cleanup are approved.
 
-**Current gate:** Planning draft only; do not create an IC-004 task branch, implement code, create a PR, or merge until the Product Owner explicitly approves the design and authorizes implementation.
+**Current gate:** Implementation was authorized on 2026-10-27. Task-to-feature integration still requires SOL approval of the exact PR head; no merge to `main` is authorized.

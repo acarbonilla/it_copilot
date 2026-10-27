@@ -1,6 +1,13 @@
 from django.urls import path
 
 from health.views import HealthView
+from session_auth.views import CsrfView, LoginView, LogoutView, MeView
 
-urlpatterns = [path("api/v1/health", HealthView.as_view(), name="health")]
+urlpatterns = [
+    path("api/v1/health", HealthView.as_view(), name="health"),
+    path("api/v1/auth/csrf", CsrfView.as_view(), name="auth-csrf"),
+    path("api/v1/auth/login", LoginView.as_view(), name="auth-login"),
+    path("api/v1/auth/logout", LogoutView.as_view(), name="auth-logout"),
+    path("api/v1/auth/me", MeView.as_view(), name="auth-me"),
+]
 handler404 = "config.errors.structured_not_found"
