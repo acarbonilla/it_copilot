@@ -41,3 +41,9 @@ A temporary ordinary active user was created in the approved native MySQL
 database, exercised only by Playwright through installed Microsoft Edge against
 the live Next.js and Django servers, and removed immediately afterward. No
 credential was committed or recorded in task documentation.
+
+## Pull request
+
+- PR: [#8](https://github.com/acarbonilla/it_copilot/pull/8)
+- Target: `feature/core-platform`
+- Merge remains prohibited pending SOL review of the exact head.

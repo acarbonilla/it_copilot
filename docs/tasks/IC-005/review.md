@@ -20,3 +20,5 @@ Implementation, automated verification, native MySQL integration, and real
 browser verification are complete. IC-005 is ready for SOL review at the exact
 submitted PR head. The PR must not be merged until SOL approves that head, and
 no feature-to-`main` authorization is implied.
+
+Review URL: [PR #8](https://github.com/acarbonilla/it_copilot/pull/8).
