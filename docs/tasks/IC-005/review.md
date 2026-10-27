@@ -22,3 +22,15 @@ submitted PR head. The PR must not be merged until SOL approves that head, and
 no feature-to-`main` authorization is implied.
 
 Review URL: [PR #8](https://github.com/acarbonilla/it_copilot/pull/8).
+
+## IC-005-REV-01 review disposition
+
+The stale module-memory CSRF finding is corrected with one narrowly triggered
+refresh-and-retry. The retry predicate requires both HTTP 403 and the structured
+machine code `csrf_failed`; it does not treat authorization denial as token
+staleness. The retry path is bounded to one additional mutation attempt.
+
+Automated negative cases and a real shared-cookie two-tab Edge scenario cover
+the finding. No endpoint contract, credential storage, role boundary, or backend
+authorization behavior changed. Ready for SOL re-review after final verification
+is attached to the exact pushed head and the inline thread is resolved.

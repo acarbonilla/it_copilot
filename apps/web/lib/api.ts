@@ -33,8 +33,18 @@ export async function bootstrapCsrf(): Promise<string> {
 }
 
 async function unsafeRequest<T>(path: string, body?: object): Promise<T> {
-  const token = csrfToken ?? await bootstrapCsrf();
-  return request<T>(path, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": token }, body: body ? JSON.stringify(body) : undefined });
+  const send = (token: string) => request<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": token },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  try {
+    return await send(csrfToken ?? await bootstrapCsrf());
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 403 || error.code !== "csrf_failed") throw error;
+    return send(await bootstrapCsrf());
+  }
 }
 
 export async function login(email: string, password: string): Promise<UserIdentity> {

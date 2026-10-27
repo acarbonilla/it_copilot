@@ -43,3 +43,23 @@ post-logout 401 sequence. The temporary E2E database user was removed.
 
 No Docker service was used. This was an actual local browser run, not a mocked
 request or PowerShell-only HTTP check.
+
+## IC-005-REV-01 results
+
+**Date:** 2026-10-27
+
+- API-client/component suite: **17 passed, 0 failed** across four files.
+- Cross-tab unit coverage: stale login and logout recovered after exactly one
+  structured `403 csrf_failed`; unrelated 403, invalid credentials, and network
+  failure were not retried; a repeated CSRF failure stopped after one retry.
+- Real-browser test: **1 passed in 14.9s** using two Microsoft Edge tabs in one
+  cookie context against live Next.js, Django, and native MySQL.
+- The two-tab run observed and recovered from both intended 403 CSRF failures:
+  tab-two login after tab-one rotation, and tab-one logout after tab-two
+  rotation. It also verified refresh restoration and post-logout denial in both
+  tabs. The temporary database user was removed after the run.
+- TypeScript, ESLint with zero warnings, and the production build: PASS.
+- Full `npm audit`: PASS, zero vulnerabilities.
+- IC-004/IC-003/IC-002 backend regressions: **45 passed, 0 failed** in 49.025s.
+- Native Django database/system check and `migrate --check`: PASS.
+- Root repository validation and `git diff --check`: PASS.

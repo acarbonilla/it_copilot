@@ -47,3 +47,17 @@ credential was committed or recorded in task documentation.
 - PR: [#8](https://github.com/acarbonilla/it_copilot/pull/8)
 - Target: `feature/core-platform`
 - Merge remains prohibited pending SOL review of the exact head.
+
+## IC-005-REV-01 — cross-tab CSRF recovery
+
+`unsafeRequest` now retries at most once and only when the first mutation fails
+with the structured HTTP 403 code `csrf_failed`. It fetches a current token from
+the CSRF bootstrap endpoint before the one retry. Invalid credentials, network
+errors, unrelated 403 responses, and every other failure are returned without
+retry. A second `csrf_failed` is returned directly, preventing an unbounded loop
+or repeated unintended mutation. All attempts retain `credentials: "include"`.
+
+The successful-login CSRF refresh remains in place, so subsequent mutations use
+the post-login rotated secret. Unit tests cover stale-token login and logout,
+non-retry boundaries, and retry exhaustion. The browser test now uses two pages
+in one browser context to reproduce Django cookie rotation across tabs.
