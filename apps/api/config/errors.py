@@ -16,3 +16,7 @@ def structured_exception_handler(exc, context):
 
 def structured_not_found(request, exception):
     return JsonResponse({"error": {"code": "not_found", "message": "Not found"}}, status=404)
+
+
+def csrf_failure(request, reason=""):
+    return JsonResponse({"error": {"code": "csrf_failed", "message": "CSRF validation failed"}}, status=403)

@@ -40,7 +40,7 @@ be changed with `MYSQL_CONNECT_TIMEOUT`, `MYSQL_READ_TIMEOUT`, and
 are the default; isolated tests use `config.settings.test`.
 
 IC-003 configures `accounts.User` before enabling `django.contrib.auth`.
-`django.contrib.admin` and sessions remain disabled. Create a development
+`django.contrib.admin` remains disabled. Create a development
 superuser, if needed for backend verification, with:
 
 ```powershell
@@ -48,6 +48,18 @@ python manage.py createsuperuser
 ```
 
 Email is the login identity; there is no username field. Application and IT
-roles must be assigned separately. Full login/session behavior belongs to
-IC-004.
+roles must be assigned separately.
+
+## Local browser authentication
+
+IC-004 uses `http://localhost:3000` for the frontend and
+`http://localhost:8000` for this API. Browser clients use
+`credentials: "include"`, bootstrap CSRF with `GET /api/v1/auth/csrf`, and send
+the returned token as `X-CSRFToken` on login and logout. Django rotates the CSRF
+secret during login, so refresh the bootstrap token before logout or another
+unsafe request.
+
+Local HTTP uses HttpOnly/Lax session cookies and a browser-readable/Lax CSRF
+cookie. Set `DJANGO_COOKIE_SECURE=true` whenever the API is served over HTTPS;
+the committed default `false` is an explicit local-development exception.
 

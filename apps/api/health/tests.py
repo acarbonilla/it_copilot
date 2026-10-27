@@ -61,15 +61,23 @@ class MigrationGuardrailTests(SimpleTestCase):
 
         self.assertEqual(settings.AUTH_USER_MODEL, "accounts.User")
         self.assertIn("django.contrib.auth", settings.INSTALLED_APPS)
+        self.assertIn("django.contrib.sessions", settings.INSTALLED_APPS)
         self.assertIn("accounts", settings.INSTALLED_APPS)
         self.assertNotIn("django.contrib.admin", settings.INSTALLED_APPS)
-        self.assertNotIn("django.contrib.sessions", settings.INSTALLED_APPS)
 
-    def test_only_one_url_pattern_is_registered(self):
+    def test_health_and_approved_auth_url_patterns_are_registered(self):
         from config.urls import urlpatterns
 
-        self.assertEqual(len(urlpatterns), 1)
-        self.assertEqual(str(urlpatterns[0].pattern), "api/v1/health")
+        self.assertEqual(
+            {str(pattern.pattern) for pattern in urlpatterns},
+            {
+                "api/v1/health",
+                "api/v1/auth/csrf",
+                "api/v1/auth/login",
+                "api/v1/auth/logout",
+                "api/v1/auth/me",
+            },
+        )
 
     def test_mysql_network_timeouts_are_finite(self):
         from config.settings import local

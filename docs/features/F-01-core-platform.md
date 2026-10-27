@@ -14,7 +14,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 | --- | --- | --- |
 | [IC-002](../tasks/IC-002/specification.md) | Django/MySQL Core and Health API | Verified; merged into feature branch via PR #5 |
 | [IC-003](../tasks/IC-003/specification.md) | Custom User Model and Roles | Verified; merged into feature branch via PR #6 |
-| IC-004 | Session Authentication and CSRF | Not started |
+| [IC-004](../tasks/IC-004/specification.md) | Session Authentication and CSRF | Implementation in progress |
 | IC-005 | Next.js Shell and Login | Not started |
 
 ## Task verification matrix
