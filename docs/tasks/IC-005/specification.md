@@ -3,7 +3,7 @@
 **Project:** IT Support Copilot V1.0 MVP  
 **Feature:** F-01 Core Platform  
 **Method:** TTDM-WA-001  
-**Status:** SOL specification and UI/security design draft — Product Owner decision pending  
+**Status:** Approved for implementation — U-01 through U-05 authorized by Product Owner on 2026-10-27
 **Dependencies:** IC-001, IC-004 (both integrated)  
 **Priority:** P0
 
@@ -89,4 +89,7 @@ The technical decisions below are SOL proposals for implementation, **not verbat
 
 ## Product Owner decision gate
 
-The Product Owner has approved **proceeding to IC-005 as the next task**. This document proposes U-01 through U-05, the route structure, placeholder behavior and browser test strategy for explicit approval before implementation handoff. No implementation is authorized by this draft alone.
+The Product Owner approved U-01 through U-05, including the route structure,
+placeholder behavior, CSRF-aware API client, and real-browser verification, and
+authorized implementation on 2026-10-27. Integration remains subject to SOL
+review of the exact PR head.

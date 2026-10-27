@@ -5,7 +5,8 @@
 | [IC-001](IC-001/specification.md) | Monorepo and Local Developer Setup | Merged into `main` via [PR #1](https://github.com/acarbonilla/it_copilot/pull/1), commit [`1cc1609a`](https://github.com/acarbonilla/it_copilot/commit/1cc1609a017dc25687b81163a04914292ed5b101) | SOL passed; Product Owner accepted; PR #2 closed without merge; documentation closeout [PR #4](https://github.com/acarbonilla/it_copilot/pull/4) merged |
 | [IC-002](IC-002/specification.md) | Django/MySQL Core and Health API | Verified and integrated into `feature/core-platform` via [PR #5](https://github.com/acarbonilla/it_copilot/pull/5) | SOL passed |
 | [IC-003](IC-003/specification.md) | Custom User Model and Roles | Verified and integrated into `feature/core-platform` via [PR #6](https://github.com/acarbonilla/it_copilot/pull/6) | SOL passed |
-| [IC-004](IC-004/specification.md) | Session Authentication and CSRF | In review ([PR #7](https://github.com/acarbonilla/it_copilot/pull/7)) | SOL review pending |
+| [IC-004](IC-004/specification.md) | Session Authentication and CSRF | Verified and integrated into `feature/core-platform` via [PR #7](https://github.com/acarbonilla/it_copilot/pull/7) | SOL passed |
+| [IC-005](IC-005/specification.md) | Next.js Shell and Login | In review ([PR #8](https://github.com/acarbonilla/it_copilot/pull/8)) | SOL review pending |
 
 ## TTDM workflow amendment
 

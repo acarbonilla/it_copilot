@@ -1,6 +1,6 @@
 # F-01 — Core Platform
 
-**Status:** In Development — IC-002, IC-003 and IC-004 Verified and integrated
+**Status:** In Development — IC-002 through IC-004 integrated; IC-005 pending SOL review
 **Feature branch:** `feature/core-platform`  
 **Approved base:** `main` at `cfeb19bf541aba962f9733289b905973d26361db`  
 **Product Owner scope approval:** 2026-10-27  
@@ -15,7 +15,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 | [IC-002](../tasks/IC-002/specification.md) | Django/MySQL Core and Health API | Verified; merged into feature branch via PR #5 |
 | [IC-003](../tasks/IC-003/specification.md) | Custom User Model and Roles | Verified; merged into feature branch via PR #6 |
 | [IC-004](../tasks/IC-004/specification.md) | Session Authentication and CSRF | Verified; merged into feature branch via PR #7 |
-| IC-005 | Next.js Shell and Login | Not started |
+| [IC-005](../tasks/IC-005/specification.md) | Next.js Shell and Login | Implemented; pending SOL review |
 
 ## Task verification matrix
 
@@ -24,7 +24,7 @@ Build the Django/MySQL core, custom user roles, session authentication/CSRF, and
 | IC-002 | [#5](https://github.com/acarbonilla/it_copilot/pull/5) | PASS at `35722ac047a6ba32d2eab4940108971db11650cc` | Yes | `1ad9dcaaa8c0002155311e9aabed68a0838df935` |
 | IC-003 | [#6](https://github.com/acarbonilla/it_copilot/pull/6) | PASS at `e79bcec6067e04623401be7b2c724d54fac98e53` | Yes | `5dec944fea94c3f6433cd4c7fd1018d317504198` |
 | IC-004 | [#7](https://github.com/acarbonilla/it_copilot/pull/7) | PASS at `c37151292b5ec9a2ecb9e87a2765196dd09b08c9` | Yes | `20bdc4e83b24f5de3ddc9a8f4455dcc3c5bedf6c` |
-| IC-005 | Not created | Pending | No | — |
+| IC-005 | [#8](https://github.com/acarbonilla/it_copilot/pull/8) | Pending | No | — |
 
 Each Task Code requires its four TTDM records and its own authorized implementation and SOL-reviewed integration gate.
 
