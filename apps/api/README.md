@@ -39,7 +39,15 @@ be changed with `MYSQL_CONNECT_TIMEOUT`, `MYSQL_READ_TIMEOUT`, and
 `MYSQL_WRITE_TIMEOUT`. Values must be positive integers. Local MySQL settings
 are the default; isolated tests use `config.settings.test`.
 
-Do not enable `django.contrib.auth`, `admin`, or `sessions`, and do not apply
-their migrations, until IC-003 supplies the custom user model in its initial
-migration.
+IC-003 configures `accounts.User` before enabling `django.contrib.auth`.
+`django.contrib.admin` and sessions remain disabled. Create a development
+superuser, if needed for backend verification, with:
+
+```powershell
+python manage.py createsuperuser
+```
+
+Email is the login identity; there is no username field. Application and IT
+roles must be assigned separately. Full login/session behavior belongs to
+IC-004.
 
