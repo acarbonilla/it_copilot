@@ -1,6 +1,6 @@
 # F-01 — Core Platform
 
-**Status:** All four F-01 tasks Verified and integrated — feature release review pending
+**Status:** Feature Completed — Product Owner accepted; merged into `main` via PR #9 on 2026-10-27
 **Feature branch:** `feature/core-platform`  
 **Approved base:** `main` at `cfeb19bf541aba962f9733289b905973d26361db`  
 **Product Owner scope approval:** 2026-10-27  
@@ -45,9 +45,9 @@ IC-002 task integration checkpoint: PR #5 reviewed head `35722ac047a6ba32d2eab49
 ## Merge and closeout
 
 - Target: `main`
-- Feature PR: Not created
-- Feature merge SHA: Not applicable
-- Feature Completed: **No**
+- Feature PR: [#9](https://github.com/acarbonilla/it_copilot/pull/9)
+- Feature merge SHA: `54c872d0bfc2f6bfe63cb5273afff5d14d0e9a9b`
+- Feature Completed: **Yes**
 
 ## IC-003 integration checkpoint (2026-10-27)
 
@@ -62,3 +62,9 @@ PR #7 session authentication/CSRF was SOL-reviewed at exact head `c37151292b5ec9
 PR #8 Next.js shell/login integration was SOL-reviewed at exact head `7073d54fe0d0ce985e0b062f4cdbb306804479f8` and merged into feature branch as `98d6c28ce48632d4413d10ef80eb3b85cb9ec295`. Verification evidence in [IC-005 test results](../tasks/IC-005/test-results.md) records 17/17 frontend API/component tests, 1/1 real two-tab Edge browser E2E, 45/45 backend regressions, typecheck/lint/build, and native MySQL checks. SOL reviewed code and recorded evidence, did not independently execute local tests; GitHub Actions CI unavailable.
 
 **All IC-002 through IC-005 task integrations are complete.** F-01 requires separate feature-level review and explicit Product Owner approval of exact feature head before merge to `main`.
+
+## F-01 final acceptance and closeout (2026-10-27)
+
+Product Owner accepted F-01 technical verification and authorized the exact feature head `6350bec85b67f0b9caf672914f9a3eb76e9587e9` for merge into `main`, subject to final PR review. SOL inspected PR #9 at that head and recorded PASS. PR #9 was merged into `main` with merge commit `54c872d0bfc2f6bfe63cb5273afff5d14d0e9a9b`.
+
+**F-01 Feature Completed: Yes.** This status applies only to Core Platform IC-002–IC-005, not to full MVP delivery or later feature groups. The final closeout documentation commit is post-merge administrative documentation and is not a change to the PO-reviewed feature head.
