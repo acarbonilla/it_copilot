@@ -1,11 +1,12 @@
 # IC-006 — Account Invitation and Activation
 
-**Status:** G1 design recommendations approved by Product Owner; specification finalized for documentation review; implementation not authorized  
+**Status:** G1 approved; Product Owner explicitly authorized IC-006 implementation on 2026-10-28; implementation complete for SOL G2 review
 **Feature:** F-02 Identity & Administration (G0 planning approved)  
 **Priority:** P0  
-**Dependencies:** IC-003 custom user/roles and IC-004 session auth/CSRF (F-01 complete); IC-008 audit integration is a F-02 sequencing constraint  
-**Owner:** SOL specification planning; Codex implementation not authorized  
-**Updated:** 2026-10-27
+**Dependencies:** IC-003 and IC-004 complete; IC-008 merged into `feature/identity-administration` at `726edee0312a6ad5522c1bf1aa08936477386336`
+**Owner:** Codex implementation; SOL review pending
+**Implementation commit:** `dfcb77c281480154ac1a7c10cd631e6e182fb16e`
+**Updated:** 2026-10-28
 
 ## 1. Source-derived requirement
 
@@ -16,7 +17,7 @@ The original *IT Support Copilot V1.0 | TTDM Development Specification*, **IC-00
 - **Verification:** API tests for expired/reused tokens and unauthorized invitation.
 - **Dependencies:** IC-003 and IC-004. **Risk:** Token disclosure or enumeration.
 
-The contract below originated as SOL's proposed G1 design details, not additional wording from the original specification. The Product Owner approved the seven enumerated design recommendations on 2026-10-27 for specification planning only. This approval does not authorize implementation.
+The contract below originated as SOL's proposed G1 design details, not additional wording from the original specification. The Product Owner approved the seven enumerated design recommendations on 2026-10-27 and separately authorized IC-006 implementation only on 2026-10-28. The later authorization does not extend to IC-007, IC-024, or unrelated scope.
 
 ## 2. Scope and exclusion
 
@@ -75,7 +76,7 @@ Existing API conventions: DRF JSON, structured `{"error":{"code":"...","message"
 
 ## 6. Audit integration and dependency gate
 
-IC-008 G1 design is approved, but **implementation is not authorized**. IC-006 must not be integrated or marked Task Verified until the required audit service is implemented and available in the F-02 feature branch under its own approved task gate. Use approved controlled event vocabulary, e.g. `account.invite_created`, `account.activation_succeeded`, `account.activation_denied`, with immutable actor IDs where available and no token/email/password in audit fields. Invitation creation and successful activation must fail closed if audit persistence fails; denied attempts may be best-effort, bounded, and sanitized. No authorization is implied for implementing IC-008 by drafting IC-006.
+IC-008 is implemented, reviewed, and merged into the F-02 feature branch. IC-006 adds `account.activation_succeeded`, `account.activation_denied`, and `account_invitation` through the required new forward migration `security_audit.0002_ic006_event_vocabulary`; the applied IC-008 migration is unchanged. Events use immutable actor IDs where available and contain no token, digest, email, password, or raw payload. Invitation creation and successful activation fail closed in the mutation transaction. Denials use IC-008's bounded autocommit-only recorder outside rolled-back transactions.
 
 ## 7. G1-approved acceptance criteria and test matrix
 
@@ -106,12 +107,12 @@ The Product Owner **approved all seven IC-006 G1 design recommendations for spec
 6. **Activation UX:** redirect to existing login; no automatic authentication.
 7. **API contract:** accept the proposed invitation/activation routes and response semantics in Section 5.
 
-This decision authorizes **finalizing specification documentation only**. It does not authorize application code, schema migrations, runtime changes, implementation task branches or any merges. PR #11 remains subject to independent documentation review and explicit merge approval.
+This was the historical G1 decision. The Product Owner subsequently authorized complete IC-006 implementation only on 2026-10-28. That later gate does not authorize IC-007 administration, IC-024 deletion, hosted deployment, audit viewing/retention, unrelated code, or any merge.
 
 ## 9. TTDM gates
 
 - **G0:** F-02 scope IC-006, IC-007, IC-008 approved; IC-024 deferred pending IC-023.
-- **G1:** The Product Owner approved the seven IC-006 design recommendations on 2026-10-27 for specification planning and authorized documentation finalization only. The specification is finalized for documentation review; implementation remains blocked.
-- **G2/G3:** Not started; no implementation task branch, task PR, or SOL review.
-- **Implementation:** **Not authorized.** This documentation PR does not grant authority for code, migrations, runtime changes, or task merges.
-- **Documentation merge:** Requires separate Product Owner approval of exact PR head after SOL documentation review.
+- **G1:** The Product Owner approved the seven IC-006 design recommendations on 2026-10-27; PR #11 later merged the approved specification.
+- **Implementation gate:** The Product Owner explicitly authorized IC-006 implementation only on 2026-10-28.
+- **G2:** Implementation and verification are complete on `task/IC-006-invitation-activation`; a draft PR targeting `feature/identity-administration` is required for SOL exact-head review.
+- **G3:** Not started. No task or feature merge is authorized by implementation completion.
