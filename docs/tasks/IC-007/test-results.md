@@ -30,3 +30,5 @@
 Corrected during implementation: DRF generic-500 assertion for injected audit failure; approved route inventory; frontend closure lint finding. The session scan and in-flight-request limitations are recorded in `implementation.md`.
 
 Repository `npm run validate` passed (19 required paths and `.env.example` secret-pattern check). `git diff --check` passed after Markdown whitespace correction. The first full backend run found the concurrency fixture's migration seed had been removed by Django test flush; the fixture now restores the production singleton invariant, the targeted native race passed, and the subsequent 107-test full regression passed.
+
+Tests above were executed against implementation content committed as `0fd44e949a069be9a081f7f9b650b67094be8191`; the later documentation-only evidence commit does not change runtime code.

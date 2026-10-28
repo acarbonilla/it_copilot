@@ -19,4 +19,4 @@
 
 Serialization is a six-field allowlist. Audit records contain only controlled vocabulary and opaque actor/target IDs. Injected audit failure rolls back user and session mutations. Django sessions do not index user ID, so revocation decodes the bounded MVP session table (O(total sessions)). Requests beginning after commit are denied immediately; an already executing request cannot be recalled. Deletion execution and cleanup remain IC-024 scope.
 
-Exact final head and draft PR URL are recorded after the evidence commit.
+Verified implementation commit: `0fd44e949a069be9a081f7f9b650b67094be8191`. The final draft PR head is recorded in the PR and delivery report because a commit cannot embed its own SHA.

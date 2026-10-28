@@ -12,4 +12,4 @@
 4. Deletion-review initiation has no delete, deactivate, cascade, ownership, session, or cleanup side effect.
 5. API and audit allowlists exclude secrets and raw request data.
 
-IC-007-AC-01 through AC-12 are mapped in `test-results.md`; final disposition belongs to SOL. Exact final head SHA and draft PR URL will be inserted after the evidence commit. No merge is authorized.
+IC-007-AC-01 through AC-12 are mapped in `test-results.md`; final disposition belongs to SOL. Verified implementation commit: `0fd44e949a069be9a081f7f9b650b67094be8191`. The final draft PR head and URL are recorded in the PR and delivery report. No merge is authorized.
