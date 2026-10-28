@@ -1,15 +1,15 @@
 # IC-008 — Audit and Authorization Test Harness
 
-**Status:** G1 design recommendations approved by Product Owner; specification documentation finalized for review; implementation prohibited  
+**Status:** G1 approved; Product Owner explicitly authorized IC-008 implementation on 2026-10-28; implementation complete for SOL review
 **Feature:** F-02 Identity & Administration  
 **Priority:** P0  
 **Requested by:** Product Owner  
 **Planned by:** SOL  
-**Implemented by:** Not assigned  
+**Implemented by:** Codex
 **Reviewed by:** Pending  
-**PR / commit:** Documentation planning PR only; no implementation PR  
+**PR / commit:** Implementation commit `3385812fdccbb377282c482772af51042db7b068`; draft implementation PR pending creation
 **Dependencies:** IC-003 (complete in F-01)  
-**Last updated:** 2026-10-27
+**Last updated:** 2026-10-28
 
 ## 1. Authoritative source contract
 
@@ -74,5 +74,5 @@ Use the existing Django test-settings suite with explicit app labels, plus new a
 
 **G0:** F-02 planning scope IC-006/007/008 approved by PO; IC-024 deferred pending IC-023; F02-D01 through D08 approved as design baseline.  
 **G1:** Product Owner approved IC-008 design recommendations on 2026-10-27 and authorized finalization of specification documentation only. This document records that design decision; its documentation PR remains draft/unmerged pending separate review.  
-**Implementation:** **Not authorized.** G1 design approval and documentation finalization do not authorize any task branch, code, migration, runtime test execution or implementation PR. Separate explicit PO implementation authorization is required.  
-**Documentation PR:** PR #10 is draft and unmerged. Review/merge requires its own separate approval; it is not an implementation authorization.
+**Implementation:** The Product Owner explicitly authorized IC-008 implementation only on 2026-10-28. That authorization supersedes the prior implementation hold for this task without authorizing IC-006, IC-007, IC-024, audit-viewing/retention work, branch merges, or unrelated scope.
+**Review:** Implementation is complete on `task/IC-008-audit-authorization-harness` and must remain a draft PR targeting `feature/identity-administration` pending SOL exact-head review. No implementation PR may be merged by this task.
