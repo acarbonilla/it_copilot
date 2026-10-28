@@ -40,4 +40,4 @@ Repository `npm run validate` passed (19 required paths and secret-pattern check
 
 Corrected during remediation: the first focused malformed-session test used a nonexistent `User.date_joined` field and was changed to `timezone.now()`; the pagination test exposed initial-load/page-load races and now uses page state plus effect cancellation. Extending the lock to invitation activation exposed Django `TransactionTestCase` flush removal of the migration seed, so an idempotent `post_migrate` receiver now restores the singleton and the 32-test IC-006 regression passed. Initial focused runs containing these failures are not reported as passes.
 
-Original tests were executed against `0fd44e949a069be9a081f7f9b650b67094be8191`. The table above records the actual post-remediation reruns; exact remediation and PR-head SHAs are recorded after commit.
+Original tests were executed against `0fd44e949a069be9a081f7f9b650b67094be8191`. The table above records the actual post-remediation reruns against content committed as `c252435534ad99c018b94dad1cb42e506d8dbf76`; the final documentation-only head is recorded in the draft PR and delivery report.

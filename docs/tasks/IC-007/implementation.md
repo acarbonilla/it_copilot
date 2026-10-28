@@ -29,4 +29,4 @@ Serialization is a six-field allowlist. Audit records contain only controlled vo
 
 Django's database session model does not index user ID, so revocation still performs an O(total sessions) scan and decode. A corrupt row that Django safely decodes to an empty unauthenticated payload remains inert; an actual decode exception fails the whole mutation closed. The design does not log session keys, cookies, decoded contents, or session data. These are bounded local-MVP constraints, not authorization to add a new session architecture.
 
-Original implementation commit: `0fd44e949a069be9a081f7f9b650b67094be8191`. Reviewed pre-remediation head: `75722f0e57d1b896e1a252a1216ec8f4e8609bde`. The remediation and final draft PR head are recorded after the evidence commit and in the delivery report.
+Original implementation commit: `0fd44e949a069be9a081f7f9b650b67094be8191`. Reviewed pre-remediation head: `75722f0e57d1b896e1a252a1216ec8f4e8609bde`. Verified remediation commit: `c252435534ad99c018b94dad1cb42e506d8dbf76`. The final documentation-only head is recorded in the draft PR and delivery report.

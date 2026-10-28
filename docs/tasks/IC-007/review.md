@@ -20,4 +20,4 @@
 
 Residual review item: the bounded MVP continues to scan Django's database session table because it has no user-ID index. This is documented and fail-closed, and no session secrets are logged.
 
-IC-007-AC-01 through AC-12 remain mapped in `test-results.md`; final disposition belongs to SOL. Reviewed head: `75722f0e57d1b896e1a252a1216ec8f4e8609bde`. The remediation head and draft PR URL are recorded after commit and in the delivery report. No merge is authorized.
+IC-007-AC-01 through AC-12 remain mapped in `test-results.md`; final disposition belongs to SOL. Reviewed head: `75722f0e57d1b896e1a252a1216ec8f4e8609bde`. Verified remediation commit: `c252435534ad99c018b94dad1cb42e506d8dbf76`. The final documentation-only head and draft PR URL are recorded in the delivery report. No merge is authorized.

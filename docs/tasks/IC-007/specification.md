@@ -9,6 +9,8 @@
 
 **G2 remediation authorization:** SOL review `5678257033` conditionally passed the reviewed head `75722f0e57d1b896e1a252a1216ec8f4e8609bde` and held G3 pending three corrections. The Product Owner authorized corrections only: common locking for every active-App-Admin membership transition, usable UI pagination, and fail-closed database-session revocation. These corrections refine the approved design without expanding product scope.
 
+**Verified remediation commit:** `c252435534ad99c018b94dad1cb42e506d8dbf76`.
+
 ## 1. Authoritative source and scope distinction
 
 The original *IT Support Copilot V1.0 | TTDM Development Specification*, **IC-007 | App Admin account lifecycle**, specifies:
