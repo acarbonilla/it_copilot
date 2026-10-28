@@ -47,3 +47,18 @@ ID domains; indexes support action/time and actor/time review. The schema has no
 metadata, email, IP address, credential, token, cookie, session identifier, raw
 payload, or exception text column. No retention or cascade behavior is defined.
 
+IC-006 adds `accounts_user.lifecycle_state`. Existing rows default to `ACTIVE`;
+new invitees use `PENDING_INVITATION` together with `is_active=False` and an
+unusable password until activation. This explicit marker prevents an existing
+inactive account from being mistaken for a pending invite and silently
+reactivated.
+
+`accounts_accountinvitation` uses a UUID primary key, protected user foreign
+key, unique 64-character SHA-256 token digest, creation/expiry/consumption/
+revocation timestamps, and a positive immutable inviter user-ID snapshot. Raw
+activation secrets and URLs are absent. A check prevents one row from being
+both consumed and revoked; `(user, created_at)` supports invitation history.
+IC-006 also extends the audit action/target constraints through the forward
+`security_audit.0002_ic006_event_vocabulary` migration without altering the
+applied IC-008 migration.
+

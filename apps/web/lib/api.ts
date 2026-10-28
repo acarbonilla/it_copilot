@@ -62,4 +62,8 @@ export async function logout(): Promise<void> {
   csrfToken = null;
 }
 
+export async function activateAccount(token: string, password: string): Promise<void> {
+  await unsafeRequest<{ status: "activated" }>("/api/v1/auth/activate", { token, password });
+}
+
 export function resetApiStateForTests() { csrfToken = null; }
