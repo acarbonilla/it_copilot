@@ -6,11 +6,13 @@ ACTION_VALUES = (
     "auth.login_success",
     "auth.login_denied",
     "account.invite_created",
+    "account.activation_succeeded",
+    "account.activation_denied",
     "account.deactivated",
     "account.reactivated",
     "authorization.denied",
 )
-TARGET_TYPE_VALUES = ("account", "authentication", "it_document", "private_resource")
+TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource")
 OUTCOME_VALUES = ("success", "denied", "failure")
 
 
@@ -19,12 +21,15 @@ class SecurityAuditEvent(models.Model):
         AUTH_LOGIN_SUCCESS = "auth.login_success", "Authentication login succeeded"
         AUTH_LOGIN_DENIED = "auth.login_denied", "Authentication login denied"
         ACCOUNT_INVITE_CREATED = "account.invite_created", "Account invitation created"
+        ACCOUNT_ACTIVATION_SUCCEEDED = "account.activation_succeeded", "Account activation succeeded"
+        ACCOUNT_ACTIVATION_DENIED = "account.activation_denied", "Account activation denied"
         ACCOUNT_DEACTIVATED = "account.deactivated", "Account deactivated"
         ACCOUNT_REACTIVATED = "account.reactivated", "Account reactivated"
         AUTHORIZATION_DENIED = "authorization.denied", "Authorization denied"
 
     class TargetType(models.TextChoices):
         ACCOUNT = "account", "Account"
+        ACCOUNT_INVITATION = "account_invitation", "Account invitation"
         AUTHENTICATION = "authentication", "Authentication"
         IT_DOCUMENT = "it_document", "IT document"
         PRIVATE_RESOURCE = "private_resource", "Private resource"

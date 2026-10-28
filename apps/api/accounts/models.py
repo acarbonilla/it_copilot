@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.core.exceptions import ValidationError
@@ -42,6 +44,10 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
+    class LifecycleState(models.TextChoices):
+        ACTIVE = "ACTIVE", "Active or legacy account"
+        PENDING_INVITATION = "PENDING_INVITATION", "Pending invitation"
+
     class ITRole(models.TextChoices):
         NONE = "NONE", "No IT role"
         IT_DOC_ADMIN = "IT_DOC_ADMIN", "IT documentation administrator"
@@ -53,6 +59,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_app_admin = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     it_role = models.CharField(max_length=20, choices=ITRole.choices, default=ITRole.NONE)
+    lifecycle_state = models.CharField(max_length=24, choices=LifecycleState.choices, default=LifecycleState.ACTIVE)
 
     objects = UserManager()
 
@@ -73,3 +80,25 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class AccountInvitation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="invitations")
+    token_digest = models.CharField(max_length=64, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    invited_by_user_id = models.BigIntegerField(editable=False)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.CheckConstraint(condition=models.Q(invited_by_user_id__gt=0), name="invitation_actor_positive"),
+            models.CheckConstraint(
+                condition=models.Q(consumed_at__isnull=True) | models.Q(revoked_at__isnull=True),
+                name="invitation_not_consumed_and_revoked",
+            ),
+        ]
+        indexes = [models.Index(fields=("user", "created_at"), name="invitation_user_time_idx")]

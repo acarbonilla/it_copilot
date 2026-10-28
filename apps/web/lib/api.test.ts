@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { bootstrapCsrf, login, logout, resetApiStateForTests } from "./api";
+import { activateAccount, bootstrapCsrf, login, logout, resetApiStateForTests } from "./api";
 
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -84,5 +84,22 @@ describe("session API client", () => {
       .mockResolvedValueOnce(json({ error: { code: "csrf_failed", message: "Failed" } }, 403));
     await expect(logout()).rejects.toMatchObject({ status: 403, code: "csrf_failed" });
     expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("activates through the CSRF-protected API without logging in", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ csrfToken: "token" }))
+      .mockResolvedValueOnce(json({ status: "activated" }));
+    await activateAccount("activation-secret", "correct horse battery staple");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]).toEqual([
+      expect.stringContaining("/api/v1/auth/activate"),
+      expect.objectContaining({
+        credentials: "include",
+        method: "POST",
+        headers: expect.objectContaining({ "X-CSRFToken": "token" }),
+        body: JSON.stringify({ token: "activation-secret", password: "correct horse battery staple" }),
+      }),
+    ]);
   });
 });

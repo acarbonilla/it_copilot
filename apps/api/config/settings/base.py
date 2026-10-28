@@ -39,6 +39,18 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 USE_TZ = True
 
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+INVITATION_TOKEN_TTL_HOURS = 24
+INVITATION_DELIVERY_MODE = os.environ.get("INVITATION_DELIVERY_MODE", "disabled")
+INVITATION_MAILBOX_ROOT = Path(os.environ.get("INVITATION_MAILBOX_ROOT", REPOSITORY_DIR / "tmp" / "invitations"))
+INVITATION_ACTIVATION_BASE_URL = os.environ.get("INVITATION_ACTIVATION_BASE_URL", "http://localhost:3000/activate")
+
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
