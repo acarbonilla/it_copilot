@@ -38,3 +38,12 @@ state; logout deletes the current row. Account deactivation blocks the next
 authenticated request through a fresh user lookup but does not bulk-delete
 historical rows, which remains IC-007 scope.
 
+IC-008 adds the append-only `security_audit_securityauditevent` table. Each row
+stores a controlled action, nullable positive actor user ID snapshot (not a
+foreign key), controlled target type, optional constrained opaque target ID,
+controlled outcome, occurrence timestamp, and optional constrained request
+correlation ID. Database checks enforce action, target type, outcome, and actor
+ID domains; indexes support action/time and actor/time review. The schema has no
+metadata, email, IP address, credential, token, cookie, session identifier, raw
+payload, or exception text column. No retention or cascade behavior is defined.
+

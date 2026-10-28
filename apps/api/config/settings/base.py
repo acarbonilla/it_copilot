@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "accounts",
+    "security_audit",
     "health",
     "session_auth",
 ]
