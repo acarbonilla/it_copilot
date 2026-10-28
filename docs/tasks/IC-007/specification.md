@@ -1,11 +1,13 @@
 # IC-007 — App Admin User Lifecycle
 
-**Status:** G1 design approved; Product Owner authorized IC-007 implementation; G2 review pending
+**Status:** G1 design approved; Product Owner authorized IC-007 implementation; G2 remediation complete, re-review pending
 **Feature:** F-02 Identity & Administration (G0 planning approved)  
 **Priority:** P0  
 **Dependencies:** IC-006 invitation/activation and IC-008 audit infrastructure integrated in F-02
 **Planner:** SOL  
 **Updated:** 2026-10-28
+
+**G2 remediation authorization:** SOL review `5678257033` conditionally passed the reviewed head `75722f0e57d1b896e1a252a1216ec8f4e8609bde` and held G3 pending three corrections. The Product Owner authorized corrections only: common locking for every active-App-Admin membership transition, usable UI pagination, and fail-closed database-session revocation. These corrections refine the approved design without expanding product scope.
 
 ## 1. Authoritative source and scope distinction
 

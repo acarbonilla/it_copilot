@@ -9,11 +9,12 @@
 | `python manage.py makemigrations --check --dry-run` | PASS, no changes |
 | `python manage.py migrate` | PASS; both IC-007 `0003` migrations applied on native MySQL |
 | `python manage.py showmigrations accounts security_audit` | PASS; all through `0003` applied |
-| `python manage.py test accounts.tests.test_lifecycle -v 1` | PASS, 10 tests including native MySQL concurrency |
-| `python manage.py test -v 1` | PASS, 107 tests in 157.232 seconds on native MySQL |
+| `python manage.py test accounts.tests.test_lifecycle -v 1` | PASS, 15 tests in 47.523 seconds on native MySQL |
+| `python manage.py test accounts.tests.test_invitations accounts.tests.test_invitation_api -v 1` | PASS, 32 tests in 59.492 seconds on native MySQL |
+| `python manage.py test -v 1` | PASS, final rerun 112 tests in 166.471 seconds on native MySQL |
 | `npm run typecheck` | PASS |
 | `npm run lint` | PASS, zero warnings |
-| `npm test -- --run` | PASS, 6 files / 25 tests |
+| `npm test -- --run` | PASS, 6 files / 27 tests |
 | `npm run build` | PASS; `/admin/users` present |
 
 ## Acceptance evidence
@@ -29,6 +30,14 @@
 
 Corrected during implementation: DRF generic-500 assertion for injected audit failure; approved route inventory; frontend closure lint finding. The session scan and in-flight-request limitations are recorded in `implementation.md`.
 
-Repository `npm run validate` passed (19 required paths and `.env.example` secret-pattern check). `git diff --check` passed after Markdown whitespace correction. The first full backend run found the concurrency fixture's migration seed had been removed by Django test flush; the fixture now restores the production singleton invariant, the targeted native race passed, and the subsequent 107-test full regression passed.
+Repository `npm run validate` passed (19 required paths and secret-pattern check), and final `git diff --check` passed. The native MySQL database reported no migrations to apply, all accounts/security-audit migrations through `0003` applied, and no model drift. One combined validation invocation from the repository root used the API-relative `..\..\.venv` path and failed to locate Python; the same Django commands were rerun from `apps/api` and passed as recorded above.
 
-Tests above were executed against implementation content committed as `0fd44e949a069be9a081f7f9b650b67094be8191`; the later documentation-only evidence commit does not change runtime code.
+## G2 remediation evidence
+
+- G2-01: native concurrent downgrade/downgrade and reactivation/deactivation tests join the existing deactivation/deactivation race. Pending activation also uses the shared protocol. All membership transitions serialize through the singleton lock and leave at least one active activated App Admin.
+- G2-02: frontend tests cover first/last disabled controls, navigation to record 21, current-page refresh after mutation, and empty results.
+- G2-03: tests cover malformed inert session data, injected decode exception, injected session deletion failure, successful multi-session denial, and audit failure rollback. No test or application log emits session keys or decoded content.
+
+Corrected during remediation: the first focused malformed-session test used a nonexistent `User.date_joined` field and was changed to `timezone.now()`; the pagination test exposed initial-load/page-load races and now uses page state plus effect cancellation. Extending the lock to invitation activation exposed Django `TransactionTestCase` flush removal of the migration seed, so an idempotent `post_migrate` receiver now restores the singleton and the 32-test IC-006 regression passed. Initial focused runs containing these failures are not reported as passes.
+
+Original tests were executed against `0fd44e949a069be9a081f7f9b650b67094be8191`. The table above records the actual post-remediation reruns; exact remediation and PR-head SHAs are recorded after commit.

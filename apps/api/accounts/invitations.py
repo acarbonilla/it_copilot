@@ -150,6 +150,11 @@ def activate_invitation(*, token, password):
         raise InvalidActivation
     digest = _token_digest(token)
     with transaction.atomic():
+        # Activation can add an active App Admin, so it participates in the
+        # same guard-before-target lock order as every IC-007 membership change.
+        from .lifecycle import _lock_guard
+
+        _lock_guard()
         try:
             invitation = AccountInvitation.objects.select_for_update().get(token_digest=digest)
         except AccountInvitation.DoesNotExist as exc:

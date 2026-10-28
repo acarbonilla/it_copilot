@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from threading import Barrier
 from unittest import skipUnless
 from unittest.mock import patch
@@ -6,6 +7,7 @@ from unittest.mock import patch
 from django.contrib.sessions.models import Session
 from django.db import DatabaseError, close_old_connections, connection
 from django.test import Client, TestCase, TransactionTestCase
+from django.utils import timezone
 
 from accounts.models import AccountDeletionReview, AdminLifecycleGuard, User
 from accounts.lifecycle import LastActiveAdmin, deactivate_user
@@ -105,6 +107,37 @@ class UserLifecycleApiTests(TestCase):
         self.assertTrue(self.target.is_active)
         self.assertTrue(Session.objects.filter(session_key=key).exists())
 
+    def test_malformed_session_is_inert_and_does_not_prevent_complete_revocation(self):
+        Session.objects.create(session_key="malformed-session", session_data="not-valid-session-data", expire_date=timezone.now() + timedelta(days=1))
+        target_client = Client()
+        target_client.force_login(self.target)
+        response = self.post(f"/api/v1/users/{self.target.pk}/deactivate")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(target_client.get("/api/v1/auth/me").status_code, 401)
+        malformed = Client()
+        malformed.cookies["sessionid"] = "malformed-session"
+        self.assertEqual(malformed.get("/api/v1/auth/me").status_code, 401)
+
+    def test_session_decode_failure_fails_closed_and_rolls_back(self):
+        target_client = Client()
+        target_client.force_login(self.target)
+        with patch("django.contrib.sessions.models.Session.get_decoded", side_effect=ValueError("injected decode failure")):
+            response = self.post(f"/api/v1/users/{self.target.pk}/deactivate")
+        self.assertEqual(response.status_code, 500)
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.is_active)
+        self.assertEqual(target_client.get("/api/v1/auth/me").status_code, 200)
+
+    def test_session_delete_failure_rolls_back_deactivation(self):
+        target_client = Client()
+        target_client.force_login(self.target)
+        with patch("django.db.models.query.QuerySet.delete", side_effect=DatabaseError("injected revocation failure")):
+            response = self.post(f"/api/v1/users/{self.target.pk}/deactivate")
+        self.assertEqual(response.status_code, 500)
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.is_active)
+        self.assertEqual(target_client.get("/api/v1/auth/me").status_code, 200)
+
 
 @skipUnless(connection.vendor == "mysql", "Requires native MySQL row-lock semantics")
 class LastAdminConcurrencyTests(TransactionTestCase):
@@ -131,4 +164,53 @@ class LastAdminConcurrencyTests(TransactionTestCase):
             results = list(pool.map(lambda ids: deactivate(*ids), ((first.pk, second.pk), (second.pk, first.pk))))
         self.assertCountEqual(results, ["success", "protected"])
         self.assertEqual(User.objects.filter(is_active=True, is_app_admin=True, lifecycle_state=User.LifecycleState.ACTIVE).count(), 1)
+
+    def test_concurrent_downgrades_cannot_remove_both_admins(self):
+        AdminLifecycleGuard.objects.get_or_create(pk=1)
+        first = User.objects.create_user("downgrade1@example.test", "long-password", is_app_admin=True)
+        second = User.objects.create_user("downgrade2@example.test", "long-password", is_app_admin=True)
+        barrier = Barrier(2)
+
+        def downgrade(actor_id, target_id):
+            close_old_connections()
+            barrier.wait()
+            try:
+                from accounts.lifecycle import update_user_roles
+                update_user_roles(actor=User.objects.get(pk=actor_id), target_id=target_id, changes={"is_app_admin": False})
+                return "success"
+            except LastActiveAdmin:
+                return "protected"
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda ids: downgrade(*ids), ((first.pk, second.pk), (second.pk, first.pk))))
+        self.assertCountEqual(results, ["success", "protected"])
+        self.assertEqual(User.objects.filter(is_active=True, is_app_admin=True, lifecycle_state=User.LifecycleState.ACTIVE).count(), 1)
+
+    def test_reactivation_and_deactivation_share_membership_lock(self):
+        AdminLifecycleGuard.objects.get_or_create(pk=1)
+        active = User.objects.create_user("active@example.test", "long-password", is_app_admin=True)
+        returning = User.objects.create_user("returning@example.test", "long-password", is_app_admin=True, is_active=False, lifecycle_state=User.LifecycleState.DEACTIVATED)
+        barrier = Barrier(2)
+
+        def transition(kind):
+            close_old_connections()
+            barrier.wait()
+            try:
+                if kind == "reactivate":
+                    from accounts.lifecycle import reactivate_user
+                    reactivate_user(actor=active, target_id=returning.pk)
+                    return "reactivated"
+                deactivate_user(actor=returning, target_id=active.pk)
+                return "deactivated"
+            except LastActiveAdmin:
+                return "protected"
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(transition, ("reactivate", "deactivate")))
+        self.assertIn("reactivated", results)
+        self.assertGreaterEqual(User.objects.filter(is_active=True, is_app_admin=True, lifecycle_state=User.LifecycleState.ACTIVE).count(), 1)
 

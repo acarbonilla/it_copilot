@@ -59,11 +59,11 @@ def _protect_last_admin(target, *, removing_admin):
 def _revoke_sessions(user_id):
     matching_ids = []
     for session in Session.objects.all().iterator():
-        try:
-            if str(session.get_decoded().get("_auth_user_id")) == str(user_id):
-                matching_ids.append(session.session_key)
-        except Exception:
-            continue
+        decoded = session.get_decoded()
+        if not isinstance(decoded, dict):
+            raise InvalidLifecycleState("Session data could not be decoded safely")
+        if str(decoded.get("_auth_user_id")) == str(user_id):
+            matching_ids.append(session.session_key)
     if matching_ids:
         Session.objects.filter(session_key__in=matching_ids).delete()
     return len(matching_ids)
@@ -121,6 +121,7 @@ def deactivate_user(*, actor, target_id):
 
 def reactivate_user(*, actor, target_id):
     with transaction.atomic():
+        _lock_guard()
         target = User.objects.select_for_update().get(pk=target_id)
         if (
             target.lifecycle_state != User.LifecycleState.DEACTIVATED

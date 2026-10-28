@@ -1,6 +1,6 @@
 # IC-007 — Review
 
-**Gate:** SOL G2 review requested
+**Gate:** SOL G2 conditional findings remediated; re-review requested
 **Merge:** Prohibited; draft PR only
 **Date:** 2026-10-28
 
@@ -12,4 +12,12 @@
 4. Deletion-review initiation has no delete, deactivate, cascade, ownership, session, or cleanup side effect.
 5. API and audit allowlists exclude secrets and raw request data.
 
-IC-007-AC-01 through AC-12 are mapped in `test-results.md`; final disposition belongs to SOL. Verified implementation commit: `0fd44e949a069be9a081f7f9b650b67094be8191`. The final draft PR head and URL are recorded in the PR and delivery report. No merge is authorized.
+## Review 5678257033 disposition
+
+- **G2-01 resolved:** common guard→target locking now includes pending-account activation and reactivation; overlapping native MySQL reactivation, deactivation, and downgrade evidence is present.
+- **G2-02 resolved:** UI pagination reaches records after the first 20, handles both boundaries and empty results, and refreshes the active page.
+- **G2-03 resolved:** no session decode exception is silently swallowed; scan/decode/delete failures abort and roll back. Malformed inert data and subsequent protected denial are explicitly tested.
+
+Residual review item: the bounded MVP continues to scan Django's database session table because it has no user-ID index. This is documented and fail-closed, and no session secrets are logged.
+
+IC-007-AC-01 through AC-12 remain mapped in `test-results.md`; final disposition belongs to SOL. Reviewed head: `75722f0e57d1b896e1a252a1216ec8f4e8609bde`. The remediation head and draft PR URL are recorded after commit and in the delivery report. No merge is authorized.
