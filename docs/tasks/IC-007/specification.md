@@ -1,6 +1,6 @@
 # IC-007 — App Admin User Lifecycle
 
-**Status:** Draft G1 specification — Product Owner design decisions pending; implementation prohibited  
+**Status:** G1 design recommendations approved by Product Owner; specification finalized for documentation review; implementation prohibited  
 **Feature:** F-02 Identity & Administration (G0 planning approved)  
 **Priority:** P0  
 **Dependencies:** IC-006 (G1 documentation approved and merged; implementation not authorized); IC-008 audit infrastructure is an integration prerequisite  
@@ -16,7 +16,7 @@ The original *IT Support Copilot V1.0 | TTDM Development Specification*, **IC-00
 - **Verification:** Permission matrix, session invalidation tests, UI admin flow.
 - **Dependency:** IC-006. **Risk:** Avoid cascades affecting shared documentation.
 
-The original specification does **not** prescribe endpoint paths, lifecycle schema, revocation mechanism, retention policy, deletion approval workflow, or exact concurrency implementation. Sections 2–8 are **SOL-proposed G1 details**, requiring Product Owner approval. F-02 G0 separately approves decisions F02-D04 through F02-D08.
+The original specification does **not** prescribe endpoint paths, lifecycle schema, revocation mechanism, retention policy, deletion approval workflow, or exact concurrency implementation. Sections 2–8 originated as **SOL-proposed G1 details**. The Product Owner approved all seven design recommendations on 2026-10-28 for specification planning only. F-02 G0 separately approves decisions F02-D04 through F02-D08.
 
 ## 2. Boundaries and prerequisites
 
@@ -31,7 +31,7 @@ The original specification does **not** prescribe endpoint paths, lifecycle sche
 - App administration requires **authenticated, active `User.is_app_admin=True`**. `it_role` (including `IT_DOC_ADMIN`) does not confer App Admin authority. `is_staff` and `is_superuser` are not substitutes for this application policy.
 - User list/details expose only a bounded administrative profile (id, email, `is_active`, `is_app_admin`, `it_role`, lifecycle status); no passwords, session IDs, invitation secrets, vault secrets, private document content or raw audit payloads.
 - Provisioning delegates to **IC-006**: invite a canonical email, assign initial `it_role` and optional App Admin flag, create pending inactive user; no direct creation of an active user with a supplied plaintext password.
-- **G1 proposal:** distinguish `pending_invitation` from `deactivated` using an explicit lifecycle marker or equivalent durable provenance; `is_active=False` alone is ambiguous. Never reactivate an unactivated pending invitation through the reactivation endpoint.
+- **G1-approved direction:** distinguish `pending_invitation` from `deactivated` using an explicit lifecycle marker or equivalent durable provenance; `is_active=False` alone is ambiguous. Never reactivate an unactivated pending invitation through the reactivation endpoint.
 - Deactivation changes an active user's state to inactive and invalidates all of their database-backed sessions, including concurrent devices. A deactivated user must fail authentication and every protected API authorization check immediately; existing CSRF tokens cannot restore access.
 - Reactivation is an explicit App Admin action on a previously activated, deactivated account. It does not create a session, reset password, restore expired invitations, grant new roles or bypass ownership checks. The user must log in again.
 - Changes to `is_app_admin` and `it_role` are server-validated, audited, and subject to last-admin protection. An App Admin has no implicit right to another user's private IT documentation or vault.
@@ -40,13 +40,13 @@ The original specification does **not** prescribe endpoint paths, lifecycle sche
 
 **G0-approved invariant:** At least one **active, activated App Admin** must remain after any administrative mutation, including deactivation, role downgrade and any future deletion. Pending/inactive invitees do **not** count.
 
-**G1 implementation proposal:** perform last-admin-affecting mutations inside a MySQL transaction with a serialization mechanism that covers *all* concurrent admin-removal requests (e.g. a dedicated singleton guard row locked with `SELECT ... FOR UPDATE` before counting and updating). Locking only the target user or counting without a shared lock is insufficient. Audit success record and mutation commit atomically; audit persistence failure aborts the mutation.
+**G1-approved architecture direction:** perform last-admin-affecting mutations inside a MySQL transaction with a serialization mechanism that covers *all* concurrent admin-removal requests (e.g. a dedicated singleton guard row locked with `SELECT ... FOR UPDATE` before counting and updating). Locking only the target user or counting without a shared lock is insufficient. Audit success record and mutation commit atomically; audit persistence failure aborts the mutation.
 
 **Edge cases:** self-deactivation, two concurrent admins deactivating each other, concurrent role downgrades, retry after database conflict, and pending App Admin invitation not counting toward the active-admin minimum. Denials use a safe stable error, with bounded sanitized denied-attempt audit where feasible.
 
 ## 5. Session revocation and authorization semantics
 
-**G1 proposal:** use a revocation strategy compatible with Django's existing database session backend. Because session records may not directly index user IDs, define and test a reliable server-side mapping or revocation generation mechanism that invalidates **all** sessions for the target user, including concurrent requests. Explicitly document the chosen implementation and ensure no plaintext session key appears in audit or application logs.
+**G1-approved direction:** use a revocation strategy compatible with Django's existing database session backend. Because session records may not directly index user IDs, define and test a reliable server-side mapping or revocation generation mechanism that invalidates **all** sessions for the target user, including concurrent requests. Explicitly document the chosen implementation and ensure no plaintext session key appears in audit or application logs.
 
 - Deactivation must persist before the response reports success; requests starting afterward must be denied immediately.
 - Role downgrades and App Admin flag removal must take effect on the next protected request, even if a session remains valid; never rely on cached frontend role state.
@@ -67,10 +67,10 @@ Maintain DRF JSON error envelope `{"error":{"code":"...","message":"..."}}`, coo
 | `POST /api/v1/users/{id}/deletion-reviews` | Active App Admin + CSRF | `202 {"review":{"id":"<opaque>","status":"pending_review"}}` | `400 invalid_state`, `404 not_found`, `409 last_active_admin` |
 
 - **Create user:** reuse approved IC-006 `POST /api/v1/users/invitations`; do not introduce an independent active-user creation bypass. This satisfies the source's admin-only create/provisioning scope via invitation.
-- **PATCH allowlist proposal:** `it_role` and `is_app_admin` only; email edits require a separate identity-verification design and are excluded from this task unless PO explicitly adds them. `is_active` must be changed only through explicit lifecycle actions, not generic PATCH.
+- **G1-approved PATCH allowlist:** `it_role` and `is_app_admin` only; email edits require a separate identity-verification design and are excluded from this task unless PO explicitly adds them. `is_active` must be changed only through explicit lifecycle actions, not generic PATCH.
 - **Deletion review initiation:** create a non-destructive review record only, with requester ID, target ID, reason code, status and timestamps. No hard/soft deletion, disabling, ownership changes, cascades or background cleanup occur by initiating review. Review cannot be mistaken for permission to execute deletion; execution is IC-024.
-- **UI proposal:** `/admin/users` for list, invite, edit roles, deactivate/reactivate, initiate deletion review with explicit confirmation. Hide controls from non-admins for usability but enforce backend checks. Show safe success/error states and require explicit confirmation for destructive-intent requests.
-- For list API, **G1 proposal:** bounded pagination (default 20, max 100), deterministic ordering, and no search across private documents. Actual MVP <=10 users but avoid unbounded responses.
+- **G1-approved UI direction:** `/admin/users` for list, invite, edit roles, deactivate/reactivate, initiate deletion review with explicit confirmation. Hide controls from non-admins for usability but enforce backend checks. Show safe success/error states and require explicit confirmation for destructive-intent requests.
+- For list API, **G1-approved pagination direction:** bounded pagination (default 20, max 100), deterministic ordering, and no search across private documents. Actual MVP <=10 users but avoid unbounded responses.
 
 ## 7. Audit and privacy contract
 
@@ -78,7 +78,7 @@ IC-008's controlled event vocabulary must be extended through a reviewed version
 
 For successful sensitive mutations, **state change and audit event must commit atomically**; on audit persistence failure, fail closed. Denied attempts are bounded best-effort outside rolled-back transactions. No audit retention period or purge is authorized.
 
-## 8. Draft acceptance criteria and verification
+## 8. G1-approved acceptance criteria and verification
 
 | ID | Acceptance criterion | Evidence |
 | --- | --- | --- |
@@ -95,20 +95,24 @@ For successful sensitive mutations, **state change and audit event must commit a
 | IC-007-AC-11 | Admin UI covers invite, list, edit, deactivate, reactivate and deletion-review initiation | Browser workflow and unauthorized UI/API tests |
 | IC-007-AC-12 | Native MySQL migrations/regressions, CSRF, existing IC-003/004/006/008 behavior and four TTDM docs verified | Exact commands, counts, PR head and SOL review |
 
-## 9. Open G1 Product Owner decisions
+## 9. Product Owner-approved G1 design decisions — 2026-10-28
 
-1. **Lifecycle state:** approve explicit durable separation of `pending_invitation` and `deactivated`, rather than inferring from `is_active` alone.
-2. **Revocation:** approve all-session invalidation on deactivation and fresh login on reactivation, with implementation strategy chosen and verified against Django DB sessions.
-3. **Last-admin:** approve shared-lock transaction serialization for admin-removal mutations; pending invitees do not count.
-4. **Editable attributes:** approve `it_role` and `is_app_admin` only; defer email edits and password reset.
-5. **Deletion initiation:** approve a non-destructive review record with no execution, deletion, disabling or cleanup until IC-024.
-6. **API and UI:** approve Section 6 routes, `/admin/users`, explicit confirmation and pagination.
-7. **Audit:** approve versioned event additions, fail-closed success mutation and sanitized denied-attempt handling.
+The Product Owner approved all seven design recommendations **for specification planning only**:
+
+1. **Lifecycle state:** durable distinction between `pending_invitation` and `deactivated`; `is_active=False` alone is insufficient.
+2. **Session revocation:** invalidate every session on deactivation; require fresh login after reactivation. The precise mechanism must be proven against the existing Django database session backend.
+3. **Last-active-App-Admin invariant:** shared-lock transaction serialization for all admin-removal mutations; pending invitees do not count.
+4. **Editable attributes:** `it_role` and `is_app_admin` only; email edits and password reset deferred.
+5. **Deletion review:** non-destructive review record only; no execution, deletion, disabling, or cleanup until separately approved IC-024.
+6. **API/UI:** Section 6 routes, `/admin/users` page, explicit confirmation, and bounded pagination.
+7. **Audit:** controlled/versioned lifecycle event additions, atomic audited success mutations, and sanitized bounded denied-attempt recording.
+
+**Approval boundary:** Finalize specification documentation only. No implementation, coding, migrations, task implementation branches, or merges were authorized. This PR still requires independent SOL documentation review and separate PO exact-head merge authorization.
 
 ## 10. TTDM gate and review
 
 - **G0:** F-02 scope and F02-D04 through D08 approved for planning.
-- **G1:** This IC-007 specification is a **draft** pending PO decision; no implementation authorization.
+- **G1:** The Product Owner approved the seven design recommendations on 2026-10-28; specification finalized for documentation review only. No implementation authorization.
 - **G2/G3:** Not started; no task branch, code, migration, implementation PR or runtime test evidence.
 - **Merge:** This draft documentation PR remains open/unmerged until separate exact-head PO merge authorization and SOL review.
 - **IC-024:** Permanent deletion and cleanup explicitly deferred until IC-023 and separate task approval.
