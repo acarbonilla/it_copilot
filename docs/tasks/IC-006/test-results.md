@@ -3,6 +3,7 @@
 **Status:** Local verification complete; SOL G2 exact-head review pending
 **Date:** 2026-10-28
 **Environment:** Windows, Asia/Singapore; Python 3.13.5; Django 5.2.7; native Windows `MySQL80`; Node/Next.js 16.4.3; SQLite in-memory where stated
+**Draft PR:** #14 targeting `feature/identity-administration`; exact final head supplied in PR and handoff
 
 ## Passing commands
 

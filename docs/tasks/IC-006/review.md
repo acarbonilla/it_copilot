@@ -3,6 +3,7 @@
 **Status:** Ready for SOL G2 exact-head review
 **Date:** 2026-10-28
 **Implementation commit:** `dfcb77c281480154ac1a7c10cd631e6e182fb16e`
+**Draft PR:** #14 targeting `feature/identity-administration`
 **Final documentation/head commit:** Supplied in the draft PR and handoff because a commit cannot contain its own SHA
 
 ## Review checklist

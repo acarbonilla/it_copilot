@@ -6,6 +6,7 @@
 **Dependencies:** IC-003 and IC-004 complete; IC-008 merged into `feature/identity-administration` at `726edee0312a6ad5522c1bf1aa08936477386336`
 **Owner:** Codex implementation; SOL review pending
 **Implementation commit:** `dfcb77c281480154ac1a7c10cd631e6e182fb16e`
+**Implementation PR:** Draft PR #14 targeting `feature/identity-administration`; exact final head supplied in PR and handoff
 **Updated:** 2026-10-28
 
 ## 1. Source-derived requirement
@@ -114,5 +115,5 @@ This was the historical G1 decision. The Product Owner subsequently authorized c
 - **G0:** F-02 scope IC-006, IC-007, IC-008 approved; IC-024 deferred pending IC-023.
 - **G1:** The Product Owner approved the seven IC-006 design recommendations on 2026-10-27; PR #11 later merged the approved specification.
 - **Implementation gate:** The Product Owner explicitly authorized IC-006 implementation only on 2026-10-28.
-- **G2:** Implementation and verification are complete on `task/IC-006-invitation-activation`; a draft PR targeting `feature/identity-administration` is required for SOL exact-head review.
+- **G2:** Implementation and verification are complete on `task/IC-006-invitation-activation`; draft PR #14 targets `feature/identity-administration` for SOL exact-head review.
 - **G3:** Not started. No task or feature merge is authorized by implementation completion.

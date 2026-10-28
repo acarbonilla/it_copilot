@@ -5,7 +5,7 @@
 **Branch:** `task/IC-006-invitation-activation`
 **Base:** `feature/identity-administration` at `726edee0312a6ad5522c1bf1aa08936477386336`
 **Implementation commit:** `dfcb77c281480154ac1a7c10cd631e6e182fb16e`
-**Draft PR:** Pending creation; must target `feature/identity-administration`
+**Draft PR:** #14 targeting `feature/identity-administration`
 
 ## Backend design
 
