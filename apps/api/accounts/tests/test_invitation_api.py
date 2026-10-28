@@ -153,9 +153,9 @@ class InvitationApiTests(TransactionTestCase):
 
     def test_no_public_account_creation_route_exists(self):
         client = Client()
-        for path in ("/api/v1/users", "/api/v1/auth/register", "/api/v1/auth/signup"):
+        for path, expected in (("/api/v1/users", 405), ("/api/v1/auth/register", 404), ("/api/v1/auth/signup", 404)):
             with self.subTest(path=path):
-                self.assertEqual(client.post(path, {}, content_type="application/json").status_code, 404)
+                self.assertEqual(client.post(path, {}, content_type="application/json").status_code, expected)
 
     def test_invalid_activation_records_sanitized_denial_without_token(self):
         client = Client(enforce_csrf_checks=True)

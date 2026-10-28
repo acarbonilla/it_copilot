@@ -10,6 +10,8 @@ ACTION_VALUES = (
     "account.activation_denied",
     "account.deactivated",
     "account.reactivated",
+    "account.role_changed",
+    "account.deletion_review_requested",
     "authorization.denied",
 )
 TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource")
@@ -25,6 +27,8 @@ class SecurityAuditEvent(models.Model):
         ACCOUNT_ACTIVATION_DENIED = "account.activation_denied", "Account activation denied"
         ACCOUNT_DEACTIVATED = "account.deactivated", "Account deactivated"
         ACCOUNT_REACTIVATED = "account.reactivated", "Account reactivated"
+        ACCOUNT_ROLE_CHANGED = "account.role_changed", "Account role changed"
+        ACCOUNT_DELETION_REVIEW_REQUESTED = "account.deletion_review_requested", "Account deletion review requested"
         AUTHORIZATION_DENIED = "authorization.denied", "Authorization denied"
 
     class TargetType(models.TextChoices):
