@@ -3,7 +3,7 @@ from unittest.mock import patch
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 from django.db.transaction import TransactionManagementError
-from django.test import TestCase
+from django.test import TransactionTestCase
 
 from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event, record_denied_event_best_effort, record_security_event
@@ -11,7 +11,7 @@ from security_audit.services import record_critical_event, record_denied_event_b
 from .factories import user_factory
 
 
-class AuditServiceTests(TestCase):
+class AuditServiceTests(TransactionTestCase):
     def valid_fields(self, **overrides):
         fields = {
             "action": SecurityAuditEvent.Action.ACCOUNT_DEACTIVATED,
@@ -66,6 +66,17 @@ class AuditServiceTests(TestCase):
             self.assertNotIn(sentinel, rendered)
         self.assertFalse(SecurityAuditEvent.objects.exists())
 
+    def test_planned_account_and_invitation_identifier_shapes_are_supported(self):
+        identifiers = (
+            "42",
+            "123e4567-e89b-42d3-a456-426614174000",
+            "123e4567e89b42d3a456426614174000",
+        )
+        for target_id in identifiers:
+            with self.subTest(target_id=target_id):
+                event = record_security_event(**self.valid_fields(target_id=target_id))
+                self.assertEqual(event.target_id, target_id)
+
     def test_controlled_vocabularies_and_actor_validation(self):
         invalid = ({"action": "custom.action"}, {"target_type": "email"}, {"outcome": "maybe"}, {"actor_user_id": -1})
         for values in invalid:
@@ -99,3 +110,29 @@ class AuditServiceTests(TestCase):
         self.assertIsNone(result)
         recorder.assert_called_once()
         self.assertNotIn("SENTINEL-SECRET", " ".join(captured.output))
+
+    def test_denied_attempt_persists_in_autocommit(self):
+        event = record_denied_event_best_effort(**self.denied_fields())
+        self.assertIsNotNone(event)
+        self.assertTrue(
+            SecurityAuditEvent.objects.filter(pk=event.pk, outcome=SecurityAuditEvent.Outcome.DENIED).exists()
+        )
+
+    def test_denied_attempt_inside_atomic_block_is_skipped_before_insert(self):
+        with patch("security_audit.services.record_security_event") as recorder:
+            with self.assertLogs("security_audit.services", level="WARNING") as captured:
+                with transaction.atomic():
+                    result = record_denied_event_best_effort(**self.denied_fields())
+        self.assertIsNone(result)
+        recorder.assert_not_called()
+        self.assertFalse(SecurityAuditEvent.objects.exists())
+        self.assertIn("skipped because autocommit is unavailable", " ".join(captured.output))
+
+    def test_denied_attempt_with_manual_autocommit_disabled_is_skipped_before_insert(self):
+        with patch("security_audit.services.connection.in_atomic_block", False):
+            with patch("security_audit.services.connection.get_autocommit", return_value=False):
+                with patch("security_audit.services.record_security_event") as recorder:
+                    with self.assertLogs("security_audit.services", level="WARNING"):
+                        result = record_denied_event_best_effort(**self.denied_fields())
+        self.assertIsNone(result)
+        recorder.assert_not_called()

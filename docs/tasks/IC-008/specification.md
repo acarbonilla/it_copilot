@@ -1,13 +1,13 @@
 # IC-008 — Audit and Authorization Test Harness
 
-**Status:** G1 approved; Product Owner explicitly authorized IC-008 implementation on 2026-10-28; implementation complete for SOL review
+**Status:** G2 conditional pass at `d9ab7b23c0ef8eb2eeeb790625d71da4750660a3`; authorized remediation in progress for SOL re-review
 **Feature:** F-02 Identity & Administration  
 **Priority:** P0  
 **Requested by:** Product Owner  
 **Planned by:** SOL  
 **Implemented by:** Codex
-**Reviewed by:** Pending  
-**PR / commit:** Implementation commit `3385812fdccbb377282c482772af51042db7b068`; draft implementation PR pending creation
+**Reviewed by:** SOL conditional exact-head review on 2026-10-28
+**PR / commit:** Draft PR #13; G2-reviewed head `d9ab7b23c0ef8eb2eeeb790625d71da4750660a3`; remediation head recorded in the PR and handoff after commit
 **Dependencies:** IC-003 (complete in F-01)  
 **Last updated:** 2026-10-28
 
@@ -70,9 +70,24 @@ Use the existing Django test-settings suite with explicit app labels, plus new a
 4. **Retention (approved constraint):** retention must be explicitly defined before any automatic cleanup; **no numerical retention period was approved**. Do not implement retention deletion jobs under IC-008. Later retention and IC-024 cleanup policy require a separate PO decision.
 5. **Privacy (approved):** exclude email, IP addresses, passwords, tokens, cookies, session IDs, raw request payloads and other secrets by default. Use immutable nonsecret IDs and optional safe request correlation only.
 
+### Denied-event transaction contract
+
+`record_denied_event_best_effort` is an autocommit-only operation. It checks both that no Django atomic block is active and that database autocommit is enabled before attempting its single insert. If either check fails, it performs no insert, emits a constant warning without supplied values, and returns `None`; authorization denial still proceeds. Callers must invoke it only after leaving any mutation transaction that will roll back. Tests prove a valid denial persists in autocommit and that atomic/manual-nonautocommit contexts are rejected before the recording service is called.
+
+### Controlled vocabulary expansion contract
+
+IC-006 or IC-007 may propose new actions or target types only in that task's separately authorized implementation PR. The owning task must:
+
+1. define a stable namespaced action and its nonsecret actor/target semantics in its specification;
+2. update the Django `TextChoices`, module value tuple, and database check constraint through a new forward migration—never edit an applied audit migration;
+3. add service, migration, sanitization, failure-mode, and vocabulary-rejection tests, then update the IC-008 compatibility documentation;
+4. obtain task-specific PO authorization and SOL exact-head review before emission is integrated.
+
+The current target format accepts positive decimal Django/MySQL IDs plus canonical UUID or 32-character lowercase hexadecimal opaque IDs. This covers current numeric account IDs and a planned UUID/hex invitation identifier. IC-006 must choose one of those nonsecret formats or propose a reviewed identifier-format change; it must also add a controlled `account_invitation` target type if the event targets the invitation rather than the account. IC-007 account lifecycle targets use the existing numeric account ID and `account` target type. Planned but not yet implemented actions such as `account.activation_succeeded`, `account.activation_denied`, `account.role_changed`, and `account.deletion_review_requested` require the expansion process above.
+
 ## 7. TTDM gate
 
 **G0:** F-02 planning scope IC-006/007/008 approved by PO; IC-024 deferred pending IC-023; F02-D01 through D08 approved as design baseline.  
-**G1:** Product Owner approved IC-008 design recommendations on 2026-10-27 and authorized finalization of specification documentation only. This document records that design decision; its documentation PR remains draft/unmerged pending separate review.  
+**G1:** Product Owner approved IC-008 design recommendations on 2026-10-27; implementation was subsequently authorized on 2026-10-28.
 **Implementation:** The Product Owner explicitly authorized IC-008 implementation only on 2026-10-28. That authorization supersedes the prior implementation hold for this task without authorizing IC-006, IC-007, IC-024, audit-viewing/retention work, branch merges, or unrelated scope.
-**Review:** Implementation is complete on `task/IC-008-audit-authorization-harness` and must remain a draft PR targeting `feature/identity-administration` pending SOL exact-head review. No implementation PR may be merged by this task.
+**Review:** Draft PR #13 targets `feature/identity-administration`. SOL issued a G2 conditional pass/integration hold at exact head `d9ab7b23c0ef8eb2eeeb790625d71da4750660a3`; the Product Owner authorized remediation of its three findings. The PR remains draft pending SOL re-review at the new exact head. No implementation PR may be merged by this task.

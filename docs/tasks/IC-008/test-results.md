@@ -1,6 +1,6 @@
 # IC-008 test results
 
-**Status:** Verification complete with one documented environment failure; SOL review pending
+**Status:** SOL G2 remediation verification complete; exact-head re-review pending
 **Date:** 2026-10-28
 **Environment:** Windows, Asia/Singapore; Python 3.13.5; Django 5.2.7; native Windows `MySQL80` service; SQLite in-memory test settings where stated
 
@@ -52,3 +52,27 @@ From `apps/api` unless noted:
 - No CI run was available during local verification.
 - No numerical retention period is approved; cleanup remains unimplemented.
 - Future IC-006/IC-007 code must integrate the service in its own authorized tasks and prove transaction placement there.
+
+## SOL G2 remediation verification — 2026-10-28
+
+The Product Owner authorized remediation of the three conditional findings on draft PR #13. The G2-reviewed pre-remediation head was `d9ab7b23c0ef8eb2eeeb790625d71da4750660a3`.
+
+| Command | Environment | Result |
+| --- | --- | --- |
+| `.venv Python manage.py test security_audit --settings=config.settings.test -v 2` | SQLite | Intermediate focused run passed 16/16 before the final manual-autocommit test was added |
+| `.venv Python manage.py check --database default --settings=config.settings.local` | Native MySQL | Passed, no issues |
+| `.venv Python manage.py migrate --check --settings=config.settings.local` | Native MySQL | Passed, exit 0 |
+| `.venv Python manage.py showmigrations security_audit --settings=config.settings.local` | Native MySQL | `security_audit.0001_initial` shown applied |
+| `.venv Python manage.py test security_audit --settings=config.settings.local -v 1` | Native MySQL | Final focused suite passed 17/17 in 2.534s; test database created and destroyed |
+| `.venv Python manage.py test security_audit accounts session_auth health --settings=config.settings.test -v 1` | SQLite | Final combined regression passed 62/62 in 44.751s |
+
+Final focused evidence proves:
+
+- a denied event persists and is queryable when called in autocommit;
+- an atomic-block call is skipped before `record_security_event` and leaves no row;
+- a call with manual autocommit disabled is skipped before `record_security_event`;
+- failure remains single-attempt and warning output never includes exception/supplied secret values;
+- numeric account IDs, canonical UUIDs, and 32-character lowercase hexadecimal opaque IDs pass target validation;
+- free text, email-like values, paths, key/value strings, and line breaks remain rejected.
+
+No new migration was necessary because the remediation changes service transaction behavior, tests, and integration documentation without changing the existing schema or vocabulary. Future vocabulary changes must use a new forward migration.

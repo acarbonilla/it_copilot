@@ -71,7 +71,10 @@ def record_critical_event(*, action, actor_user_id, target_type, target_id, outc
 
 
 def record_denied_event_best_effort(*, action, actor_user_id, target_type, target_id, request_id=None):
-    """Make one bounded persistence attempt; denial behavior never depends on its success."""
+    """Make one bounded autocommit attempt; never write inside an atomic block."""
+    if connection.in_atomic_block or not connection.get_autocommit():
+        logger.warning("Security audit denial event skipped because autocommit is unavailable")
+        return None
     try:
         return record_security_event(
             action=action,
