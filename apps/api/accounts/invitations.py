@@ -3,6 +3,7 @@ import json
 import os
 import re
 import secrets
+import uuid
 from datetime import timedelta
 from pathlib import Path
 
@@ -42,6 +43,10 @@ def _token_digest(token):
     return hashlib.sha256(token.encode("ascii")).hexdigest()
 
 
+def _invitation_id():
+    return uuid.uuid4()
+
+
 def _delivery_file(invitation, *, email, token):
     if not settings.DEBUG or settings.INVITATION_DELIVERY_MODE != "file":
         raise ImproperlyConfigured("Invitation delivery requires the explicitly enabled development file sink")
@@ -53,12 +58,15 @@ def _delivery_file(invitation, *, email, token):
     if destination.parent != mailbox_root:
         raise ImproperlyConfigured("Invitation mailbox path escaped its configured root")
     activation_url = f"{settings.INVITATION_ACTIVATION_BASE_URL.rstrip('/')}/{token}"
+    created = False
     try:
         descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        created = True
         with os.fdopen(descriptor, "w", encoding="utf-8") as mailbox_file:
             json.dump({"recipient": email, "activation_url": activation_url}, mailbox_file)
     except Exception:
-        destination.unlink(missing_ok=True)
+        if created:
+            destination.unlink(missing_ok=True)
         raise
     return destination
 
@@ -117,6 +125,7 @@ def create_or_reissue_invitation(*, actor, email, it_role, is_app_admin):
                 revoked_at__isnull=True,
             ).update(revoked_at=now)
             invitation = AccountInvitation.objects.create(
+                id=_invitation_id(),
                 user=user,
                 token_digest=_token_digest(token),
                 expires_at=now + timedelta(hours=settings.INVITATION_TOKEN_TTL_HOURS),

@@ -14,10 +14,12 @@ vi.mock("@/lib/api", async (load) => {
 describe("ActivationForm", () => {
   beforeEach(() => { replace.mockReset(); vi.mocked(activateAccount).mockReset(); });
 
-  it("keeps the token out of rendered content", () => {
+  it("keeps the token out of rendered content and scrubs the path after hydration", async () => {
+    window.history.replaceState({}, "", "/activate/SENTINEL-TOKEN");
     const { container } = render(<ActivationForm token="SENTINEL-TOKEN" />);
     expect(container).not.toHaveTextContent("SENTINEL-TOKEN");
     expect(container.innerHTML).not.toContain("SENTINEL-TOKEN");
+    await waitFor(() => expect(window.location.pathname).toBe("/activate"));
   });
 
   it("checks length and confirmation before submission", async () => {

@@ -1,5 +1,6 @@
 import json
 import tempfile
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import skipUnless
@@ -150,6 +151,33 @@ class InvitationServiceTests(TransactionTestCase):
             with self.assertRaises(OSError):
                 self.invite("delivery-failure@example.test")
         self.assertFalse(User.objects.filter(email="delivery-failure@example.test").exists())
+        self.assertEqual(list(Path(self.mailbox.name).iterdir()), [])
+
+    def test_delivery_collision_preserves_preexisting_file_and_rolls_back(self):
+        collision_id = uuid.UUID("123e4567-e89b-42d3-a456-426614174000")
+        artifact = Path(self.mailbox.name) / f"{collision_id}.json"
+        artifact.write_text("PREEXISTING-SENTINEL", encoding="utf-8")
+        with patch("accounts.invitations._invitation_id", return_value=collision_id):
+            with self.assertRaises(FileExistsError):
+                self.invite("collision@example.test")
+        self.assertEqual(artifact.read_text(encoding="utf-8"), "PREEXISTING-SENTINEL")
+        self.assertFalse(User.objects.filter(email="collision@example.test").exists())
+        self.assertFalse(AccountInvitation.objects.filter(pk=collision_id).exists())
+
+    def test_database_commit_failure_after_delivery_removes_artifact_and_rolls_back(self):
+        commit_attempted = False
+
+        def fail_commit():
+            nonlocal commit_attempted
+            commit_attempted = True
+            raise DatabaseError("simulated commit failure")
+
+        with patch.object(connection, "commit", side_effect=fail_commit):
+            with self.assertRaises(DatabaseError):
+                self.invite("commit-failure@example.test")
+        self.assertTrue(commit_attempted)
+        self.assertFalse(User.objects.filter(email="commit-failure@example.test").exists())
+        self.assertFalse(AccountInvitation.objects.filter(user__email="commit-failure@example.test").exists())
         self.assertEqual(list(Path(self.mailbox.name).iterdir()), [])
 
     def test_invitation_audit_failure_rolls_back_user_invitation_and_delivery(self):

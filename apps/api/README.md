@@ -79,3 +79,12 @@ when the local verification session ends. Host filesystem ACLs remain the
 operator's responsibility, especially on Windows where POSIX mode bits are not
 an access-control boundary. Production-like runs must leave delivery disabled.
 
+The database and filesystem do not share a distributed transaction. The service
+removes a newly created artifact on write errors, transaction-body failures, and
+caught database commit failures; a filename collision never removes the file it
+found. A process or host crash after the write but before database commit can
+still leave an orphan file. Such a token has no committed digest and cannot
+activate an account, but the file remains sensitive local data and must be
+removed by the documented end-of-session cleanup. Conversely, filesystem loss
+after a successful database commit has no automatic redelivery mechanism.
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { activateAccount, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,12 @@ export function ActivationForm({ token }: { token: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (window.location.pathname.startsWith("/activate/")) {
+      window.history.replaceState(window.history.state, "", "/activate");
+    }
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
