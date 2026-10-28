@@ -1,6 +1,6 @@
 # IC-006 test results
 
-**Status:** Local verification complete; SOL G2 exact-head review pending
+**Status:** G2 remediation verification complete; exact-head re-review pending
 **Date:** 2026-10-28
 **Environment:** Windows, Asia/Singapore; Python 3.13.5; Django 5.2.7; native Windows `MySQL80`; Node/Next.js 16.4.3; SQLite in-memory where stated
 **Draft PR:** #14 targeting `feature/identity-administration`; exact final head supplied in PR and handoff
@@ -59,3 +59,38 @@ Commands were run from `apps/api`, `apps/web`, or the repository root as appropr
 - The development file sink is not an external mail transport and has no delivery retry queue.
 - Existing inactive legacy accounts migrate as lifecycle `ACTIVE` and are deliberately not invitation-eligible. IC-007 may refine lifecycle representation under its own authorization.
 - No CI evidence was available; results are local. Retention, audit viewing, and deletion remain outside scope.
+
+## SOL G2 remediation — 2026-10-28
+
+SOL issued a conditional pass/G3 hold at reviewed head `54e55ee16ee22a628b4477867c28c5a218832806`. The remediation implementation commit is `91485fef60ef47adbb35373deef59427327d02dd`.
+
+| Command/check | Environment | Result |
+| --- | --- | --- |
+| Three focused collision/partial-write/commit-failure tests | SQLite | Passed 3/3 in 3.455s |
+| Four focused collision/partial-write/commit-failure/concurrency tests | Native MySQL | Passed 4/4 in 7.207s |
+| Native collision test plus full `accounts.tests.test_invitations` rerun | Native MySQL | Passed focused 1/1 and final 25/25 in 44.401s |
+| `manage.py test accounts security_audit session_auth health --settings=config.settings.test -v 1` | SQLite | Final regression passed 97/97 in 82.493s; 13 native-only cases skipped |
+| `npm test -- --reporter=verbose` | jsdom | Passed 23/23; history test proves `/activate/<token>` becomes `/activate` after hydration |
+| `npm run typecheck` / `npm run lint` / `npm run build` | Next.js 16.4.3 | Passed; build includes static `/activate` and dynamic `/activate/[token]` |
+| Production `next start` response inspection with fake sentinel | Local HTTP | HTTP 200; three total token occurrences, all three in scripts; zero outside scripts/visible text; `no-referrer`; zero external asset URLs |
+| `next start` output after sentinel request | Local process output | No request-path output emitted by the framework process |
+| Django test/local checks, model-drift check, native `migrate --check`/`showmigrations`, `npm run validate`, `git diff --check` | SQLite/native MySQL/repository | Passed; both IC-006 migrations remain applied and no model changes were detected |
+
+Remediation assertions:
+
+- A forced UUID/file collision raises `FileExistsError`, preserves exact pre-existing sentinel contents, and rolls back user/invitation rows.
+- A partial JSON write deletes the newly created partial artifact and rolls back the database.
+- A simulated database `commit()` failure after successful artifact creation invokes rollback and removes the artifact; no user/invitation survives.
+- Native MySQL repeats these failure cases and retains the two-thread single-activation guarantee.
+- Actual Next.js HTML does contain the token in serialized hydration payloads. Documentation no longer claims HTML absence.
+
+Remediation failures encountered:
+
+1. The first full native 25-test remediation run failed two collision cases because patching Django's model-field default was order/backend dependent, despite passing focused runs. Invitation creation now uses a private UUID4 generator with a deterministic test seam; the focused and complete native reruns passed.
+2. The first production server restart received `EADDRINUSE` from a prior local verification child process. The explicitly identified local Node processes were stopped, the server restarted, and the response inspection completed. This is not counted as a passing first attempt.
+
+Residual consistency and exposure limitations:
+
+- No distributed transaction exists across MySQL and the filesystem. Caught failures are cleaned, but sudden process/host loss can leave an orphan artifact. With no committed digest it cannot activate, yet it still contains sensitive local data.
+- Filesystem loss after a successful database commit can make a valid invitation undeliverable; the local sink has no durable retry protocol.
+- History scrubbing occurs after hydration. The token necessarily exists in the initial address/request, browser network tooling, serialized hydration source, and memory. Future reverse-proxy/access logging must redact activation paths before hosted use.

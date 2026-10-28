@@ -1,10 +1,12 @@
 # IC-006 implementation
 
-**Status:** Implementation and local verification complete; SOL G2 review pending
+**Status:** SOL G2 conditional findings remediated; exact-head re-review pending
 **Date:** 2026-10-28
 **Branch:** `task/IC-006-invitation-activation`
 **Base:** `feature/identity-administration` at `726edee0312a6ad5522c1bf1aa08936477386336`
 **Implementation commit:** `dfcb77c281480154ac1a7c10cd631e6e182fb16e`
+**G2-reviewed head:** `54e55ee16ee22a628b4477867c28c5a218832806`
+**G2 remediation commit:** `91485fef60ef47adbb35373deef59427327d02dd`
 **Draft PR:** #14 targeting `feature/identity-administration`
 
 ## Backend design
@@ -32,9 +34,11 @@
 
 Delivery defaults to disabled. A local developer must explicitly set `DJANGO_DEBUG=true` and `INVITATION_DELIVERY_MODE=file`. Each invitation creates one mode-`0600` JSON artifact under ignored `tmp/invitations` by default, named with the nonsecret invitation UUID. The operator retrieves that file locally, never through an API. Files must not be served, logged, committed, synced, or shared; delete used artifacts and clear stale/revoked artifacts after the verification session. Windows host ACLs remain operator-controlled because POSIX mode bits alone are not a Windows security boundary.
 
+Cleanup tracks whether the current call successfully completed exclusive creation. `FileExistsError` therefore preserves an existing path and rolls the database back. Partial writes and caught database commit failures delete only the newly owned artifact. Database commit and filesystem persistence cannot be made durably atomic without a transactional delivery store: a process/host crash between write and commit can orphan a file whose token has no committed digest, while file loss after commit has no automatic retry. The local-only sink, unusable orphan tokens, exclusive creation, and mandatory cleanup bound—but do not eliminate—that residual.
+
 ## Frontend
 
-Next.js route `/activate/[token]` awaits the Next.js 16 dynamic params contract and renders a password/confirmation form. The client uses the existing CSRF bootstrap/retry client, sends credentials only to the activation endpoint, renders no token text, and replaces the token URL with `/login` after success. It does not authenticate. Both page metadata and a route-specific HTTP header set `Referrer-Policy: no-referrer`; the page has no third-party assets.
+Next.js route `/activate/[token]` awaits the Next.js 16 dynamic params contract and renders a password/confirmation form. Production response inspection with a fake sentinel found three token occurrences, all inside Next.js hydration scripts and none in non-script HTML or visible text. The client uses the existing CSRF bootstrap/retry client, immediately replaces the address/history entry with tokenless `/activate`, sends credentials only to the activation endpoint, and replaces the entry with `/login` after success. It does not authenticate. Both page metadata and a route-specific HTTP header set `Referrer-Policy: no-referrer`; the page has no third-party assets. Initial network URLs, serialized response source, browser developer tools, process memory, and future access logs can still contain the token and remain within the local-only trust boundary.
 
 ## Scope preserved
 
