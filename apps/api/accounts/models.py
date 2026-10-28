@@ -47,6 +47,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     class LifecycleState(models.TextChoices):
         ACTIVE = "ACTIVE", "Active or legacy account"
         PENDING_INVITATION = "PENDING_INVITATION", "Pending invitation"
+        DEACTIVATED = "DEACTIVATED", "Deactivated account"
 
     class ITRole(models.TextChoices):
         NONE = "NONE", "No IT role"
@@ -102,3 +103,30 @@ class AccountInvitation(models.Model):
             ),
         ]
         indexes = [models.Index(fields=("user", "created_at"), name="invitation_user_time_idx")]
+
+
+class AdminLifecycleGuard(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+
+
+class AccountDeletionReview(models.Model):
+    class Reason(models.TextChoices):
+        NO_LONGER_NEEDED = "NO_LONGER_NEEDED", "Account no longer needed"
+        SECURITY_CONCERN = "SECURITY_CONCERN", "Security concern"
+        DUPLICATE_ACCOUNT = "DUPLICATE_ACCOUNT", "Duplicate account"
+
+    class Status(models.TextChoices):
+        PENDING_REVIEW = "PENDING_REVIEW", "Pending review"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    target = models.ForeignKey(User, on_delete=models.PROTECT, related_name="deletion_reviews")
+    requested_by_user_id = models.BigIntegerField(editable=False)
+    reason_code = models.CharField(max_length=32, choices=Reason.choices)
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.PENDING_REVIEW)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.CheckConstraint(condition=models.Q(requested_by_user_id__gt=0), name="deletion_review_actor_positive")
+        ]

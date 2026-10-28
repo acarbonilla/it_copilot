@@ -1,9 +1,9 @@
 # IC-007 — App Admin User Lifecycle
 
-**Status:** G1 design recommendations approved by Product Owner; specification finalized for documentation review; implementation prohibited  
+**Status:** G1 design approved; Product Owner authorized IC-007 implementation; G2 review pending
 **Feature:** F-02 Identity & Administration (G0 planning approved)  
 **Priority:** P0  
-**Dependencies:** IC-006 (G1 documentation approved and merged; implementation not authorized); IC-008 audit infrastructure is an integration prerequisite  
+**Dependencies:** IC-006 invitation/activation and IC-008 audit infrastructure integrated in F-02
 **Planner:** SOL  
 **Updated:** 2026-10-28
 
@@ -16,7 +16,7 @@ The original *IT Support Copilot V1.0 | TTDM Development Specification*, **IC-00
 - **Verification:** Permission matrix, session invalidation tests, UI admin flow.
 - **Dependency:** IC-006. **Risk:** Avoid cascades affecting shared documentation.
 
-The original specification does **not** prescribe endpoint paths, lifecycle schema, revocation mechanism, retention policy, deletion approval workflow, or exact concurrency implementation. Sections 2–8 originated as **SOL-proposed G1 details**. The Product Owner approved all seven design recommendations on 2026-10-28 for specification planning only. F-02 G0 separately approves decisions F02-D04 through F02-D08.
+The original specification does **not** prescribe endpoint paths, lifecycle schema, revocation mechanism, retention policy, deletion approval workflow, or exact concurrency implementation. Sections 2–8 originated as **SOL-proposed G1 details**. The Product Owner first approved all seven design recommendations on 2026-10-28 for specification planning, then explicitly authorized IC-007 implementation in the current assignment. F-02 G0 separately approves decisions F02-D04 through F02-D08.
 
 ## 2. Boundaries and prerequisites
 
@@ -97,7 +97,7 @@ For successful sensitive mutations, **state change and audit event must commit a
 
 ## 9. Product Owner-approved G1 design decisions — 2026-10-28
 
-The Product Owner approved all seven design recommendations **for specification planning only**:
+The following list preserves the original G1 planning approval; the later IC-007 assignment supplies implementation authorization:
 
 1. **Lifecycle state:** durable distinction between `pending_invitation` and `deactivated`; `is_active=False` alone is insufficient.
 2. **Session revocation:** invalidate every session on deactivation; require fresh login after reactivation. The precise mechanism must be proven against the existing Django database session backend.
@@ -107,12 +107,12 @@ The Product Owner approved all seven design recommendations **for specification 
 6. **API/UI:** Section 6 routes, `/admin/users` page, explicit confirmation, and bounded pagination.
 7. **Audit:** controlled/versioned lifecycle event additions, atomic audited success mutations, and sanitized bounded denied-attempt recording.
 
-**Approval boundary:** Finalize specification documentation only. No implementation, coding, migrations, task implementation branches, or merges were authorized. This PR still requires independent SOL documentation review and separate PO exact-head merge authorization.
+**Approval boundary:** IC-007 implementation only. Merge remains prohibited until SOL G2/G3 review and separate Product Owner exact-head approval.
 
 ## 10. TTDM gate and review
 
 - **G0:** F-02 scope and F02-D04 through D08 approved for planning.
-- **G1:** The Product Owner approved the seven design recommendations on 2026-10-28; specification finalized for documentation review only. No implementation authorization.
-- **G2/G3:** Not started; no task branch, code, migration, implementation PR or runtime test evidence.
-- **Merge:** This draft documentation PR remains open/unmerged until separate exact-head PO merge authorization and SOL review.
+- **G1:** The Product Owner approved the seven design recommendations on 2026-10-28. A later assignment explicitly authorized IC-007 implementation while preserving these decisions.
+- **G2/G3:** Implementation evidence is recorded in the living documents; SOL review is pending.
+- **Merge:** The IC-007 draft implementation PR must remain unmerged until separate exact-head PO authorization after SOL review.
 - **IC-024:** Permanent deletion and cleanup explicitly deferred until IC-023 and separate task approval.
