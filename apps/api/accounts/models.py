@@ -84,6 +84,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class AccountInvitation(models.Model):
+    class DeliveryFormat(models.TextChoices):
+        LEGACY_PATH = "LEGACY_PATH", "Legacy path token"
+        FRAGMENT_V1 = "FRAGMENT_V1", "URL fragment token v1"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="invitations")
     token_digest = models.CharField(max_length=64, unique=True, editable=False)
@@ -92,6 +96,12 @@ class AccountInvitation(models.Model):
     consumed_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     invited_by_user_id = models.BigIntegerField(editable=False)
+    delivery_format = models.CharField(
+        max_length=16,
+        choices=DeliveryFormat.choices,
+        default=DeliveryFormat.FRAGMENT_V1,
+        editable=False,
+    )
 
     class Meta:
         ordering = ("-created_at",)

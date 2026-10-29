@@ -130,6 +130,7 @@ def create_or_reissue_invitation(*, actor, email, it_role, is_app_admin):
                 token_digest=_token_digest(token),
                 expires_at=now + timedelta(hours=settings.INVITATION_TOKEN_TTL_HOURS),
                 invited_by_user_id=actor.pk,
+                delivery_format=AccountInvitation.DeliveryFormat.FRAGMENT_V1,
             )
             record_critical_event(
                 action=SecurityAuditEvent.Action.ACCOUNT_INVITE_CREATED,

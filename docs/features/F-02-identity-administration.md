@@ -1,6 +1,6 @@
 # F-02 — Identity & Administration
 
-**Status:** Integration review; SOL feature closeout review pending
+**Status:** Security remediation implementation complete; SOL exact-head review pending
 
 **Feature branch:** `feature/identity-administration`
 
@@ -15,6 +15,14 @@
 **SOL reviewer:** SOL
 
 This record reconciles the integrated feature and newly executed closeout evidence. It does not authorize a feature-to-`main` merge. Task integration is complete; SOL closeout review and separate Product Owner exact-head merge authorization remain required.
+
+## F02-SEC-001 activation-token remediation (2026-10-29)
+
+The original F02-D01/D03 browser-URL limitation is remediated on `fix/f02-sec-001-activation-token-exposure`: activation delivery now uses `/activate#token=...`, the static client scrubs the fragment before form rendering, the dynamic token route is removed, and legacy path requests receive a constant non-reflecting 404 response. Existing invitation rows receive durable `LEGACY_PATH` provenance while new rows are `FRAGMENT_V1`.
+
+A dry-run-by-default management command provides separately authorized, actor-attributed legacy revocation/reissue. It uses the lifecycle guard and row locks, revalidates eligibility, revokes expired records without replacement, and has native-MySQL concurrency, idempotence, rollback, and artifact-failure evidence. No non-test execution was performed.
+
+Updated acceptance evidence is in `docs/tasks/F02-SEC-001/test-results.md`: 122 backend tests, 32 frontend tests, native migration/drift checks, TypeScript/lint/build, development/production synthetic-token scans, explicit legacy rejection, and a passing real-Chrome invitation-to-activation journey. This remediation does not authorize task integration, feature-to-main merge, IC-024, or a production command execution.
 
 ## Scope and gate history
 

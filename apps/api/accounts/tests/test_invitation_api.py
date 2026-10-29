@@ -47,7 +47,7 @@ class InvitationApiTests(TransactionTestCase):
 
     def delivered_token(self, invitation_id):
         artifact = Path(self.mailbox.name) / f"{invitation_id}.json"
-        return json.loads(artifact.read_text(encoding="utf-8"))["activation_url"].rsplit("/", 1)[-1]
+        return json.loads(artifact.read_text(encoding="utf-8"))["activation_url"].split("#token=", 1)[1]
 
     def activate(self, client, csrf_token, token, password="unique-long-passphrase-4829"):
         return client.post(

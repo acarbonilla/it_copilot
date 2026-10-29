@@ -1,5 +1,6 @@
 from django.db import connection
 from django.db.migrations.loader import MigrationLoader
+from django.db.migrations.operations.fields import AddField, AlterField
 from django.test import TestCase
 
 from accounts.models import AccountInvitation, User
@@ -14,6 +15,15 @@ class InvitationMigrationTests(TestCase):
         self.assertIn(("accounts", "0001_initial"), accounts_migration.dependencies)
         self.assertIn(("security_audit", "0001_initial"), audit_migration.dependencies)
 
+    def test_delivery_format_migration_marks_existing_rows_legacy_then_changes_default(self):
+        loader = MigrationLoader(connection)
+        migration = loader.disk_migrations[("accounts", "0004_invitation_delivery_format")]
+        add = next(operation for operation in migration.operations if isinstance(operation, AddField))
+        alter = next(operation for operation in migration.operations if isinstance(operation, AlterField))
+        self.assertEqual(add.field.default, AccountInvitation.DeliveryFormat.LEGACY_PATH)
+        self.assertFalse(add.preserve_default)
+        self.assertEqual(alter.field.default, AccountInvitation.DeliveryFormat.FRAGMENT_V1)
+
     def test_invitation_table_and_user_lifecycle_column_exist(self):
         self.assertIn(AccountInvitation._meta.db_table, connection.introspection.table_names())
         with connection.cursor() as cursor:
@@ -26,7 +36,7 @@ class InvitationMigrationTests(TestCase):
             }
         self.assertEqual(
             invitation_columns,
-            {"id", "user_id", "token_digest", "created_at", "expires_at", "consumed_at", "revoked_at", "invited_by_user_id"},
+            {"id", "user_id", "token_digest", "created_at", "expires_at", "consumed_at", "revoked_at", "invited_by_user_id", "delivery_format"},
         )
         self.assertIn("lifecycle_state", user_columns)
 
