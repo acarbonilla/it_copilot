@@ -1,9 +1,11 @@
 # F02-SEC-001 — Activation Token Exposure Remediation
 
-**Status:** G1 approved; implementation authorized; G2 review requested  
+**Status:** G1 approved; implementation authorized; G2 locking remediation complete, re-review requested
 **Feature:** F-02 Identity & Administration  
 **Baseline:** `c5aca48438b7aaca3b67c3fbb4753c432d7631ae`  
 **Updated:** 2026-10-29
+
+**G2 remediation:** SOL identified that ordinary invitation creation/reissue locked the target user without first acquiring `AdminLifecycleGuard`, while legacy remediation used guard-first locking. All invitation replacement paths now use the common guard-first protocol. A native MySQL race between ordinary re-invitation and legacy remediation is required evidence for re-review.
 
 ## Scope
 
@@ -22,6 +24,7 @@ Provide a controlled command that is dry-run by default and requires both `--exe
 5. Delivery, audit, or database-commit failure rolls back lifecycle state and removes any newly created artifact.
 6. Expired legacy invitations are revoked without replacement.
 7. Native MySQL, frontend, SSR/log scan, and real-browser evidence passes.
+8. Ordinary creation/reissue, activation, and legacy remediation acquire the shared lifecycle guard before target user or invitation locks; concurrent ordinary re-invitation and legacy remediation leave exactly one usable invitation.
 
 ## Boundaries
 

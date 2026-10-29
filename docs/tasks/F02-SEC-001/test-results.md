@@ -5,12 +5,13 @@
 
 | Command | Result |
 | --- | --- |
-| `python manage.py check --database default` | PASS — 0 issues |
+| `python manage.py check --database default` | PASS — 0 issues on G2 remediation head |
 | `python manage.py migrate` | PASS — native MySQL applied both `0004` migrations |
-| `python manage.py makemigrations --check --dry-run` | PASS — no changes |
+| `python manage.py makemigrations --check --dry-run` | PASS — no changes on G2 remediation head |
 | `python manage.py showmigrations accounts security_audit` | PASS — both apps through `0004` |
-| `python manage.py test -v 1` | PASS — 122 tests in 179.786s on native MySQL |
-| focused invitation/remediation/migration tests | PASS — 44 tests, then 13 focused tests; includes native concurrency and failure injection |
+| `python manage.py migrate --check` | PASS — native MySQL schema current |
+| `python manage.py test -v 1` | PASS — 123 tests in 200.028s on native MySQL |
+| `python manage.py test accounts.tests.test_legacy_invitation_remediation accounts.tests.test_invitations -v 2` | PASS — 35 tests in 64.502s, including native ordinary-reinvite/remediation race |
 | `npm test -- --run` | PASS — 7 files / 32 tests |
 | `npm run typecheck` | PASS |
 | `npm run lint` | PASS after removal of one unused suppression; final rerun recorded with delivery |
@@ -32,6 +33,15 @@
 | Expired revoke/no reissue | remediation service test | PASS |
 | Idempotence and concurrency | repeat execution plus native two-thread MySQL test | PASS |
 | Rollback/artifact recovery | delivery, audit, and database commit failure tests | PASS |
+| Common guard-first lock order | source assertion through cross-path behavior plus native same-user race | PASS |
+| Cross-path revocation and sole usability | original/superseded tokens denied; exactly one active artifact token activates once | PASS |
+| Cross-path audit and artifacts | actor-consistent token-free audit events; every artifact maps to a persisted invitation | PASS |
 | CSRF/single use/expiry/generic errors/fresh login | full backend and frontend regression suites | PASS |
 
 The first browser run intentionally caught Next.js development 404 reflection of the legacy synthetic token. `proxy.ts` and scoped development log suppression corrected it; the unchanged scenario then passed. No live remediation command execution occurred against non-test data.
+
+## G2 remediation evidence
+
+The new native MySQL barrier race starts ordinary `create_or_reissue_invitation()` and `remediate_legacy_invitation()` concurrently for the same pending user. Both paths acquire the singleton lifecycle guard before their target locks. The test accepts either legitimate serialized ordering and verifies the legacy invitation is revoked, only the ordinary replacement remains unconsumed/unrevoked, every superseded delivered token is rejected, the sole active token activates exactly once, audit events have the expected counts and actor snapshots, no delivered token appears in serialized audit fields, and retained file-sink artifacts all reference persisted invitation UUIDs.
+
+Final G2 frontend rerun: `npm run typecheck`, `npm run lint`, `npm test -- --run` (7 files / 32 tests), and `npm run build` all passed. Repository and whitespace checks are rerun before the remediation commit. The prior 122-test result remains historical evidence for the original implementation head; the 123-test result above is authoritative for this remediation.

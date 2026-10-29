@@ -92,6 +92,12 @@ def create_or_reissue_invitation(*, actor, email, it_role, is_app_admin):
     artifact = None
     try:
         with transaction.atomic():
+            # Invitation replacement and legacy remediation can target the same
+            # pending account. Serialize both through the lifecycle guard before
+            # either path locks or mutates the user/invitation rows.
+            from .lifecycle import _lock_guard
+
+            _lock_guard()
             try:
                 user = User.objects.select_for_update().get(email=normalized_email)
             except User.DoesNotExist:

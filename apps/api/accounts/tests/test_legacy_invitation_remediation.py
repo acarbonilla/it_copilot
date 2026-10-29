@@ -1,6 +1,8 @@
 import json
+import secrets
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -10,6 +12,7 @@ from django.db import DatabaseError, close_old_connections, connection
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
+from accounts.invitations import InvalidActivation, _token_digest, activate_invitation, create_or_reissue_invitation
 from accounts.legacy_invitation_remediation import remediate_legacy_invitation
 from accounts.models import AccountInvitation, User
 from security_audit.models import SecurityAuditEvent
@@ -155,3 +158,117 @@ class LegacyInvitationRemediationTests(TransactionTestCase):
         self.assertCountEqual(outcomes, ["reissued", "already_remediated"])
         self.assertEqual(AccountInvitation.objects.count(), 2)
         self.assertEqual(len(list(Path(self.mailbox.name).iterdir())), 1)
+
+    def test_ordinary_reinvitation_racing_legacy_remediation_is_guard_serialized(self):
+        if connection.vendor != "mysql":
+            self.skipTest("requires native MySQL row locking")
+        original = self.legacy(email="race@example.test")
+        legacy_token = secrets.token_urlsafe(32)
+        AccountInvitation.objects.filter(pk=original.pk).update(token_digest=_token_digest(legacy_token))
+        legacy_artifact = Path(self.mailbox.name) / f"{original.pk}.json"
+        legacy_artifact.write_text(
+            json.dumps(
+                {
+                    "recipient": original.user.email,
+                    "activation_url": f"http://localhost:3000/activate/{legacy_token}",
+                }
+            ),
+            encoding="utf-8",
+        )
+        start = Barrier(2)
+
+        def ordinary_reinvite():
+            close_old_connections()
+            try:
+                start.wait()
+                actor = User.objects.get(pk=self.actor.pk)
+                invitation = create_or_reissue_invitation(
+                    actor=actor,
+                    email=original.user.email,
+                    it_role=User.ITRole.IT_EDITOR,
+                    is_app_admin=False,
+                )
+                return "ordinary", str(invitation.pk)
+            finally:
+                close_old_connections()
+
+        def legacy_remediation():
+            close_old_connections()
+            try:
+                start.wait()
+                actor = User.objects.get(pk=self.actor.pk)
+                result = remediate_legacy_invitation(actor=actor, invitation_id=original.pk)
+                return result.outcome, result.replacement_id
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            ordinary_future = executor.submit(ordinary_reinvite)
+            remediation_future = executor.submit(legacy_remediation)
+            ordinary_result = ordinary_future.result()
+            remediation_result = remediation_future.result()
+
+        original.refresh_from_db()
+        self.assertIsNotNone(original.revoked_at)
+        active_invitations = list(
+            AccountInvitation.objects.filter(
+                user=original.user,
+                consumed_at__isnull=True,
+                revoked_at__isnull=True,
+            )
+        )
+        self.assertEqual(len(active_invitations), 1)
+        active = active_invitations[0]
+        self.assertEqual(active.delivery_format, AccountInvitation.DeliveryFormat.FRAGMENT_V1)
+        self.assertEqual(ordinary_result, ("ordinary", str(active.pk)))
+        self.assertIn(remediation_result[0], {"reissued", "already_remediated"})
+
+        artifacts = {}
+        for artifact in Path(self.mailbox.name).glob("*.json"):
+            invitation_id = artifact.stem
+            delivery = json.loads(artifact.read_text(encoding="utf-8"))
+            self.assertTrue(AccountInvitation.objects.filter(pk=invitation_id).exists())
+            artifacts[invitation_id] = delivery["activation_url"]
+        self.assertEqual(artifacts[str(original.pk)], f"http://localhost:3000/activate/{legacy_token}")
+        self.assertIn(str(active.pk), artifacts)
+        self.assertEqual(artifacts[str(active.pk)].split("#token=", 1)[0], "http://localhost:3000/activate")
+
+        delivered_tokens = {}
+        for invitation_id, url in artifacts.items():
+            delivered_tokens[invitation_id] = url.split("#token=", 1)[1] if "#token=" in url else url.rsplit("/", 1)[1]
+        for invitation_id, token in delivered_tokens.items():
+            if invitation_id == str(active.pk):
+                continue
+            with self.assertRaises(InvalidActivation):
+                activate_invitation(token=token, password="unique-long-passphrase-4829")
+        activated = activate_invitation(
+            token=delivered_tokens[str(active.pk)],
+            password="unique-long-passphrase-4829",
+        )
+        self.assertEqual(activated.pk, original.user_id)
+
+        events = list(SecurityAuditEvent.objects.order_by("id"))
+        self.assertTrue(events)
+        self.assertTrue(all(event.actor_user_id in {None, self.actor.pk} for event in events))
+        self.assertEqual(
+            sum(event.action == SecurityAuditEvent.Action.ACCOUNT_INVITE_CREATED for event in events),
+            1,
+        )
+        expected_remediation_events = 1 if remediation_result[0] == "reissued" else 0
+        self.assertEqual(
+            sum(event.action == SecurityAuditEvent.Action.ACCOUNT_INVITE_REVOKED for event in events),
+            expected_remediation_events,
+        )
+        self.assertEqual(
+            sum(event.action == SecurityAuditEvent.Action.ACCOUNT_INVITE_REISSUED for event in events),
+            expected_remediation_events,
+        )
+        serialized_events = json.dumps(
+            list(
+                SecurityAuditEvent.objects.values(
+                    "action", "actor_user_id", "target_type", "target_id", "outcome"
+                )
+            )
+        )
+        for token in delivered_tokens.values():
+            self.assertNotIn(token, serialized_events)

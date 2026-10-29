@@ -24,6 +24,8 @@ A dry-run-by-default management command provides separately authorized, actor-at
 
 Updated acceptance evidence is in `docs/tasks/F02-SEC-001/test-results.md`: 122 backend tests, 32 frontend tests, native migration/drift checks, TypeScript/lint/build, development/production synthetic-token scans, explicit legacy rejection, and a passing real-Chrome invitation-to-activation journey. This remediation does not authorize task integration, feature-to-main merge, IC-024, or a production command execution.
 
+G2 locking remediation adds the shared lifecycle guard to ordinary invitation creation/reissue before target-user access. Native MySQL now exercises an ordinary re-invitation racing legacy remediation for the same pending user and proves one usable invitation, safe revocation, consistent audit attribution, and attributable retained delivery artifacts. The authoritative post-remediation full-suite count is 123 backend tests; frontend remains 32 tests with typecheck, lint, and build passing.
+
 ## Scope and gate history
 
 F-02 contains IC-008 audit and authorization infrastructure, IC-006 invitation and activation, and IC-007 App Admin lifecycle administration. The Product Owner first approved F-02 and F02-D01 through F02-D08 as a planning baseline, then separately authorized each task through TTDM. Original decisions remain preserved in the task living documents.
