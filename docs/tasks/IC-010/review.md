@@ -2,7 +2,7 @@
 
 **Review gate:** F-03 Batch A authorization G2
 **Status:** Submitted for independent review
-**Exact review head:** Pending final Batch A documentation commit
+**Exact review head:** The submitted `feature/documentation-management` head reported with the SOL G2 handoff; SOL must bind its decision to that full SHA.
 
 ## Objective PASS conditions
 

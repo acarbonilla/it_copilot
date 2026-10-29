@@ -1,7 +1,7 @@
 # IC-010 Implementation Record
 
 **Batch:** F-03 Batch A
-**Implementation commit:** Pending Batch A commit creation
+**Implementation commit:** `494973c3ed493ce4b484dd819f41a3c9fa4f5277`
 
 ## Implementation
 

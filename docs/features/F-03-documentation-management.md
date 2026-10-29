@@ -172,8 +172,8 @@ Product Owner/SOL resolution is required for:
 
 **Tasks:** IC-009 Document Domain and Lifecycle; IC-010 Document Authorization and Ownership
 **Status:** Implemented and tested; submitted for SOL G2 exact-head review
-**Implementation commit:** Pending Batch A commit creation
-**Exact review head:** Pending final evidence commit
+**Implementation commit:** `494973c3ed493ce4b484dd819f41a3c9fa4f5277`
+**Exact review head:** The full SHA of the evidence commit containing this record is the Batch A SOL G2 review head and is reported in the handoff/PR.
 
 Batch A adds the `documents` Django domain app, native MySQL schema foundations, transactional lifecycle services, the shared document authorization policy, five controlled audit actions, and focused/full backend evidence. It does not add upload/storage I/O, worker execution, API routes, frontend screens, recovery commands, or F-04 behavior.
 
