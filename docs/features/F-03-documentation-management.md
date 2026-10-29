@@ -10,7 +10,7 @@ The single ratifiable proposal is [F-03 Consolidated G1 Requirements Proposal](F
 
 The Product Owner ratified the proposal at `5016a7b50edcfc8d67824e13bbb647a116fdbe79`, including Batches A-E subject to exact-head SOL G2 PASS at the four defined boundaries. SOL G1 review is `5693795827`. The finalized baseline separates document visibility from version processing, requires enforceable Windows parser process isolation/deadlines/resource limits, and protects extracted/staged text as document content. The exact finalization commit is recorded below after creation.
 
-**Finalized G1 specification commit:** Pending commit creation
+**Finalized G1 specification commit:** `054bb5427b898a2e46eb085892d0b3f58a71b54c`
 
 ## Scope and source status
 
