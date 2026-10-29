@@ -1,6 +1,6 @@
 # F02-SEC-001 — Test Results
 
-**Environment:** Windows 11 / PowerShell; Django 5.2.7; native MySQL; Next.js 16.4.3; installed Google Chrome  
+**Environment:** Windows 11 / PowerShell; Django 5.2.7; native MySQL; Next.js 16.4.3; installed Google Chrome
 **Date:** 2026-10-29
 
 | Command | Result |

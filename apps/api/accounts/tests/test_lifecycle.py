@@ -213,4 +213,3 @@ class LastAdminConcurrencyTests(TransactionTestCase):
             results = list(pool.map(transition, ("reactivate", "deactivate")))
         self.assertIn("reactivated", results)
         self.assertGreaterEqual(User.objects.filter(is_active=True, is_app_admin=True, lifecycle_state=User.LifecycleState.ACTIVE).count(), 1)
-
