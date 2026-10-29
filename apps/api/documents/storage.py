@@ -10,7 +10,9 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 
-_STORAGE_KEY = re.compile(r"^originals/[0-9a-f]{2}/[0-9a-f]{32}\.bin$")
+_STORAGE_KEY = re.compile(
+    r"^(?:originals/[0-9a-f]{2}/[0-9a-f]{32}\.bin|extracted/[0-9a-f]{32}/[0-9a-f]{32}\.txt)$"
+)
 
 
 class ArtifactStorageError(Exception):
@@ -135,10 +137,41 @@ class PrivateArtifactStore:
         if not isinstance(storage_key, str) or not _STORAGE_KEY.fullmatch(storage_key):
             raise ArtifactStorageError("Artifact identifier is invalid")
         path = self.root / Path(*storage_key.split("/"))
-        self._assert_private_path(path, require_exists=True)
+        try:
+            self._assert_private_path(path, require_exists=True)
+        except OSError as exc:
+            raise ArtifactStorageError("Artifact is unavailable") from exc
         if not path.is_file() or _is_reparse_point(path):
             raise ArtifactStorageError("Artifact is not a private regular file")
         return path
+
+    def allocate_extracted_path(self, version_id):
+        version_hex = getattr(version_id, "hex", None)
+        if not isinstance(version_hex, str) or not re.fullmatch(r"[0-9a-f]{32}", version_hex):
+            raise ArtifactStorageError("Document version identifier is invalid")
+        storage_key = f"extracted/{version_hex}/{uuid.uuid4().hex}.txt"
+        path = self.root / Path(*storage_key.split("/"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._assert_private_path(path)
+        return storage_key, path
+
+    def inspect_text(self, storage_key):
+        path = self.resolve(storage_key)
+        digest = hashlib.sha256()
+        byte_length = 0
+        decoder_chunks = []
+        try:
+            with path.open("rb") as source:
+                while chunk := source.read(64 * 1024):
+                    byte_length += len(chunk)
+                    digest.update(chunk)
+                    decoder_chunks.append(chunk)
+            text = b"".join(decoder_chunks).decode("utf-8", errors="strict")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ArtifactStorageError("Extracted artifact is invalid") from exc
+        if not text or len(text) > settings.DOCUMENT_EXTRACTION_MAX_CHARACTERS:
+            raise ArtifactStorageError("Extracted artifact violates its content bound")
+        return StoredArtifact(storage_key, digest.hexdigest(), byte_length), len(text)
 
     def delete(self, storage_key):
         path = self.resolve(storage_key)

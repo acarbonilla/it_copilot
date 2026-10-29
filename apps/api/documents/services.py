@@ -158,6 +158,10 @@ def _transition(*, actor, document_id, expected_revision, from_states, to_state,
             if document.visibility not in from_states:
                 raise DocumentConflictError("Document lifecycle transition is not allowed")
             previous = document.visibility
+            if to_state in {Document.Visibility.ARCHIVED, Document.Visibility.DELETED}:
+                from .jobs import cancel_document_jobs
+
+                cancel_document_jobs(document)
             document.visibility = to_state
             document.metadata_revision += 1
             document.deleted_at = timezone.now() if to_state == Document.Visibility.DELETED else None

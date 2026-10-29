@@ -1,9 +1,9 @@
 # F-03 — Documentation Management
 
-**Status:** Consolidated G1 ratified with mandatory clarifications; Batch A authorized
+**Status:** Consolidated G1 ratified; Batches A-B accepted at SOL G2; Batch C submitted for SOL G2
 **Branch:** `feature/documentation-management`
 **Verified planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
-**Product Owner authorization:** Planning, investigation, feature-branch preparation, and task specification only
+**Product Owner authorization:** Ratified IC-009 through IC-017 and bounded Batches A-E, subject to exact-head SOL G2 boundaries
 **SOL planning review:** PASS, review `5693729644`
 
 The single ratifiable proposal is [F-03 Consolidated G1 Requirements Proposal](F-03-consolidated-g1-proposal.md). Every task definition and decision there is explicitly proposed rather than represented as an existing authoritative requirement.
@@ -40,19 +40,19 @@ Excluded until separately specified: F-04 Copilot/retrieval behavior, external A
 
 ## Task inventory and requirements gap
 
-| Task | Authoritative title | Authoritative objective/acceptance | Planning disposition |
+| Task | Ratified title | Ratified source | Current disposition |
 | --- | --- | --- | --- |
-| IC-009 | Not present | Not present | Blocked pending source definition |
-| IC-010 | Not present | Not present | Blocked pending source definition |
-| IC-011 | Not present | Not present | Blocked pending source definition |
-| IC-012 | Not present | Not present | Blocked pending source definition |
-| IC-013 | Not present | Not present | Blocked pending source definition |
-| IC-014 | Not present | Not present | Blocked pending source definition |
-| IC-015 | Not present | Not present | Blocked pending source definition |
-| IC-016 | Not present | Not present | Blocked pending source definition |
-| IC-017 | Not present | Not present | Blocked pending source definition |
+| IC-009 | Document Domain and Lifecycle | Consolidated G1 proposal | Batch A implemented; SOL G2 PASS |
+| IC-010 | Document Authorization and Ownership | Consolidated G1 proposal | Batch A implemented; SOL G2 PASS |
+| IC-011 | Secure Upload and Private Artifact Storage | Consolidated G1 proposal | Batch B remediated; SOL G2 PASS |
+| IC-012 | Database-Backed Processing Job Lifecycle | Consolidated G1 proposal | Batch C implemented; SOL G2 pending |
+| IC-013 | Document Processing Worker and Text Extraction | Consolidated G1 proposal | Batch C implemented; SOL G2 pending |
+| IC-014 | Document Management API | Consolidated G1 proposal | Batch D not started |
+| IC-015 | Document Management User Interface | Consolidated G1 proposal | Batch D not started |
+| IC-016 | Reconciliation, Recovery, and Operator Controls | Consolidated G1 proposal | Batch E not started |
+| IC-017 | F-03 Integrated Security and Acceptance | Consolidated G1 proposal | Batch E not started |
 
-Until the consolidated proposal is ratified or replacement definitions are supplied, task specifications and four-document task folders must not claim G1 approval.
+The Product Owner ratified the consolidated proposal. Implementation remains bounded by the batch-specific SOL G2 gates recorded below.
 
 ## Dependency graph
 
@@ -202,6 +202,23 @@ Living documents: [IC-011 specification](../tasks/IC-011/specification.md), [imp
 SOL review `5695041394` required security remediation at `47e1a12b9000e6e3b7957446fc4ae9690598f4c3`. The replacement implementation isolates PDF preflight behind a handshake-controlled Windows Job Object, enforces and verifies a service/SYSTEM-only private-root ACL plus replacement lock, and rejects invalid request lengths before multipart parsing. Batch C remains blocked pending SOL G2 PASS on the new exact review head.
 
 **Batch B security remediation commit:** `16d3e1a3baf0c1af982cd672bd0d1ecd1c4e0e3a`
+
+## Batch C implementation inventory
+
+**Tasks:** IC-012 Database-Backed Processing Job Lifecycle and IC-013 Document Processing Worker and Text Extraction
+**Baseline:** `ea47fe4f0d6a4555cb9ac449654910afc61ae318`
+**SOL Batch B G2:** PASS, review `5695573969`
+**Status:** Implemented and tested; pending SOL G2 exact-head review
+**Implementation commit:** Pending commit creation
+
+Batch C adds deterministic native-MySQL job claiming, 60-second leases and 20-second heartbeats, three bounded attempts with 5/30-second retry delays, cancellation and stale-worker fencing, a Django-managed worker, Windows Job Object-isolated PDF/TXT/Markdown extraction, private normalized text artifacts, and transactional candidate publication. It adds no document-content API/UI, download route, operator recovery command, retrieval/chunking/embedding behavior, ADR-001 change, or IC-024 change.
+
+Living documents:
+
+- [IC-012 specification](../tasks/IC-012/specification.md), [implementation](../tasks/IC-012/implementation.md), [test results](../tasks/IC-012/test-results.md), and [review](../tasks/IC-012/review.md)
+- [IC-013 specification](../tasks/IC-013/specification.md), [implementation](../tasks/IC-013/implementation.md), [test results](../tasks/IC-013/test-results.md), and [review](../tasks/IC-013/review.md)
+
+Batch D remains blocked pending independent SOL G2 PASS on the exact Batch C review head.
 
 ## Planning recommendation
 

@@ -118,6 +118,8 @@ class ProcessingJob(models.Model):
     lease_expires_at = models.DateTimeField(null=True, blank=True, editable=False)
     heartbeat_at = models.DateTimeField(null=True, blank=True, editable=False)
     cancellation_requested = models.BooleanField(default=False)
+    last_error_code = models.CharField(max_length=32, blank=True, editable=False)
+    completed_at = models.DateTimeField(null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -135,6 +137,31 @@ class ProcessingJob(models.Model):
                     | models.Q(state__in=("SUCCEEDED", "FAILED", "CANCELLED"), nonterminal_slot__isnull=True)
                 ),
                 name="processing_job_slot_matches_state",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state="RUNNING",
+                        lease_owner__isnull=False,
+                        lease_expires_at__isnull=False,
+                        heartbeat_at__isnull=False,
+                    )
+                    | (
+                        ~models.Q(state="RUNNING")
+                        & models.Q(lease_owner__isnull=True, lease_expires_at__isnull=True, heartbeat_at__isnull=True)
+                    )
+                ),
+                name="processing_job_lease_matches_state",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(state__in=("SUCCEEDED", "FAILED", "CANCELLED"), completed_at__isnull=False)
+                    | (
+                        ~models.Q(state__in=("SUCCEEDED", "FAILED", "CANCELLED"))
+                        & models.Q(completed_at__isnull=True)
+                    )
+                ),
+                name="processing_job_completion_matches_state",
             ),
         ]
         indexes = [models.Index(fields=("state", "available_at"), name="processing_job_claim_idx")]
@@ -161,6 +188,7 @@ class ExtractedTextArtifact(models.Model):
     sha256_digest = models.CharField(max_length=64, editable=False)
     byte_length = models.PositiveBigIntegerField()
     character_count = models.PositiveIntegerField()
+    page_count = models.PositiveIntegerField(null=True, blank=True)
     extractor_version = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
