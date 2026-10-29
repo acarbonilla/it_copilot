@@ -2,6 +2,7 @@
 
 **Batch:** F-03 Batch A
 **Implementation commit:** `494973c3ed493ce4b484dd819f41a3c9fa4f5277`
+**SOL G2 remediation commit:** Pending remediation commit creation
 
 ## Implementation
 
@@ -13,6 +14,12 @@
 - Added audit vocabulary for document create, metadata update, archive, restore, and deletion. Critical audit writes share the mutation transaction.
 
 No upload, artifact I/O, parser, worker, public API, UI, purge command, or F-04 behavior was introduced.
+
+## SOL G2 remediation
+
+- Added model/service-boundary validation that rejects `current_version` or `candidate_version` references unless the version belongs to that same document.
+- The guard runs on normal model saves before later publication services can use either reference. Later Batch C publication code must use this guarded path and must not use queryset bulk updates to bypass domain validation.
+- Added positive same-document and negative cross-document tests for both reference fields.
 
 ## Migrations
 

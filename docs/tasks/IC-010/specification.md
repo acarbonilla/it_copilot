@@ -28,5 +28,5 @@ Deleted documents are denied through normal content/metadata policy for every ro
 3. App Admin alone has no content, download, edit, process, or lifecycle capability. Combining App Admin with an IT role grants only that IT role's document rights.
 4. Query filtering and direct-object authorization produce the same owner/admin boundary and always exclude deleted documents.
 5. Inactive/deactivated identities are denied on the next policy evaluation.
-6. Cross-owner and App Admin-only sensitive mutation denials use generic permission errors and controlled best-effort denial audit records without document text/title/path.
+6. Existing cross-owner, nonexistent, deleted, deactivated, and role-downgraded document identifiers produce the same generic unavailable exception/message. Controlled best-effort denial audit records omit the supplied document identifier as well as document text/title/path, so restricted audit metadata cannot become an existence oracle.
 7. The full matrix and audit behavior are covered by executable tests.

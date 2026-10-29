@@ -177,6 +177,10 @@ Product Owner/SOL resolution is required for:
 
 Batch A adds the `documents` Django domain app, native MySQL schema foundations, transactional lifecycle services, the shared document authorization policy, five controlled audit actions, and focused/full backend evidence. It does not add upload/storage I/O, worker execution, API routes, frontend screens, recovery commands, or F-04 behavior.
 
+SOL review `5694183813` required a Batch A correction at head `98cdb657bffc1807873be959b37223ba39fcec31`. The remediation unifies locked resolution of cross-owner/missing/deleted documents, reloads actor lifecycle/role state, removes probed identifiers from denial audits, and rejects cross-document current/candidate version references. Updated native MySQL focused and full-regression evidence is recorded in the IC-009 and IC-010 living documents. Batch B remains blocked pending SOL G2 PASS on the new exact head.
+
+**Batch A remediation implementation commit:** Pending remediation commit creation
+
 Living documents:
 
 - [IC-009 specification](../tasks/IC-009/specification.md), [implementation](../tasks/IC-009/implementation.md), [test results](../tasks/IC-009/test-results.md), and [review](../tasks/IC-009/review.md)

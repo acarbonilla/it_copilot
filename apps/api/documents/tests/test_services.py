@@ -1,6 +1,6 @@
+import uuid
 from unittest.mock import patch
 
-from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError
 from django.test import TestCase, TransactionTestCase
 
@@ -8,6 +8,7 @@ from accounts.models import User
 from documents.models import Document
 from documents.services import (
     DocumentConflictError,
+    DocumentUnavailableError,
     archive_document,
     create_document,
     delete_document,
@@ -86,15 +87,43 @@ class DocumentServiceTests(TestCase):
 
 
 class DocumentDenialAuditTests(TransactionTestCase):
-    def test_cross_owner_and_app_admin_are_denied_with_controlled_audit(self):
+    def test_unavailable_identifiers_are_indistinguishable_and_non_oracular(self):
         owner = User.objects.create_user("owner-denial@example.test", None, it_role=User.ITRole.IT_MEMBER)
         other = User.objects.create_user("other-denial@example.test", None, it_role=User.ITRole.IT_EDITOR)
-        app_admin = User.objects.create_user("appadmin-denial@example.test", None, is_app_admin=True)
         document = create_document(actor=owner, title="Runbook")
-        for actor in (other, app_admin):
-            with self.subTest(actor=actor.email):
-                with self.assertRaises(PermissionDenied):
-                    update_document_metadata(actor=actor, document_id=document.pk, expected_revision=1, title="Forbidden")
+
+        deleted_owner = User.objects.create_user("deleted-owner@example.test", None, it_role=User.ITRole.IT_MEMBER)
+        deleted = create_document(actor=deleted_owner, title="Deleted")
+        delete_document(actor=deleted_owner, document_id=deleted.pk, expected_revision=1)
+
+        deactivated = User.objects.create_user("deactivated@example.test", None, it_role=User.ITRole.IT_MEMBER)
+        deactivated_document = create_document(actor=deactivated, title="Deactivated")
+        User.objects.filter(pk=deactivated.pk).update(
+            is_active=False,
+            lifecycle_state=User.LifecycleState.DEACTIVATED,
+        )
+
+        downgraded = User.objects.create_user("downgraded@example.test", None, it_role=User.ITRole.IT_EDITOR)
+        downgraded_document = create_document(actor=downgraded, title="Downgraded")
+        User.objects.filter(pk=downgraded.pk).update(it_role=User.ITRole.NONE)
+
+        attempts = (
+            (other, document.pk),
+            (other, uuid.uuid4()),
+            (deleted_owner, deleted.pk),
+            (deactivated, deactivated_document.pk),
+            (downgraded, downgraded_document.pk),
+        )
+        outcomes = []
+        for actor, document_id in attempts:
+            with self.subTest(actor=actor.email, document_id=document_id):
+                with self.assertRaises(DocumentUnavailableError) as raised:
+                    update_document_metadata(actor=actor, document_id=document_id, expected_revision=1, title="Forbidden")
+                outcomes.append((raised.exception.__class__, str(raised.exception)))
+
+        self.assertEqual(set(outcomes), {(DocumentUnavailableError, "Document is unavailable")})
         denied = SecurityAuditEvent.objects.filter(action=SecurityAuditEvent.Action.AUTHORIZATION_DENIED)
-        self.assertEqual(denied.count(), 2)
-        self.assertEqual(set(denied.values_list("target_id", flat=True)), {str(document.pk)})
+        self.assertEqual(denied.count(), 5)
+        self.assertEqual(set(denied.values_list("target_id", flat=True)), {None})
+        self.assertEqual(set(denied.values_list("target_type", flat=True)), {SecurityAuditEvent.TargetType.IT_DOCUMENT})
+        self.assertEqual(set(denied.values_list("outcome", flat=True)), {SecurityAuditEvent.Outcome.DENIED})

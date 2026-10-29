@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -50,6 +51,25 @@ class Document(models.Model):
             models.Index(fields=("owner", "visibility", "created_at"), name="document_owner_state_idx"),
             models.Index(fields=("visibility", "created_at"), name="document_state_time_idx"),
         ]
+
+    def _validate_version_ownership(self):
+        errors = {}
+        for field_name in ("current_version", "candidate_version"):
+            version_id = getattr(self, f"{field_name}_id")
+            if version_id is None:
+                continue
+            if self.pk is None or not DocumentVersion.objects.filter(pk=version_id, document_id=self.pk).exists():
+                errors[field_name] = "Version must belong to this document"
+        if errors:
+            raise ValidationError(errors)
+
+    def clean(self):
+        super().clean()
+        self._validate_version_ownership()
+
+    def save(self, *args, **kwargs):
+        self._validate_version_ownership()
+        return super().save(*args, **kwargs)
 
 
 class DocumentVersion(models.Model):

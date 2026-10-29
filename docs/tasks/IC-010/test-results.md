@@ -12,14 +12,15 @@
 - Inactive/deactivated owner: denied immediately.
 - Deleted document: denied even to `IT_DOC_ADMIN` through normal access policy.
 - Querysets: owner scoped, `IT_DOC_ADMIN` organization-wide, App Admin-only empty, deleted excluded.
-- Cross-owner and App Admin-only mutation denials: generic `PermissionDenied`; two controlled `authorization.denied` records containing only actor/target IDs and vocabulary fields.
+- Existing cross-owner, nonexistent UUID, deleted document, deactivated owner, and stale role-downgraded owner: identical `DocumentUnavailableError("Document is unavailable")` outcomes.
+- All five unavailable attempts produce controlled `authorization.denied` records with `target_id = NULL`; restricted audit consumers cannot distinguish identifier existence from those records.
 
 ## Commands
 
 | Command | Result |
 | --- | --- |
-| `manage.py test documents --settings=config.settings.test -v 1` | PASS - authorization/service/constraint suite |
-| `manage.py test documents -v 2` | PASS - 19/19 native MySQL |
-| `manage.py test -v 1` | PASS - complete 142-test native MySQL backend regression |
+| `manage.py test documents --settings=config.settings.test -v 2` | PASS - 20 tests; MySQL concurrency test intentionally skipped |
+| `manage.py test documents -v 2` | PASS - 20/20 native MySQL |
+| `manage.py test -v 1` | PASS - complete 143-test native MySQL backend regression |
 
 No API, frontend, or browser route exists in Batch A; those enforcement surfaces remain mandatory later-batch G2 evidence.
