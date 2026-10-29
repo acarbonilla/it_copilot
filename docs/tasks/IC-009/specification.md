@@ -1,7 +1,7 @@
 # IC-009 - Document Domain and Lifecycle
 
 **Status:** Product Owner ratified under the F-03 consolidated G1 baseline
-**Finalized G1 specification:** `054bb54c8183e3e62e9d32686492375c0e3f35e3`
+**Finalized G1 specification:** `054bb5427b898a2e46eb085892d0b3f58a71b54c`
 **Dependencies:** IC-002, IC-003, and IC-008
 
 ## Objective
