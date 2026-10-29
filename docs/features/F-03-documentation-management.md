@@ -201,7 +201,7 @@ Living documents: [IC-011 specification](../tasks/IC-011/specification.md), [imp
 
 SOL review `5695041394` required security remediation at `47e1a12b9000e6e3b7957446fc4ae9690598f4c3`. The replacement implementation isolates PDF preflight behind a handshake-controlled Windows Job Object, enforces and verifies a service/SYSTEM-only private-root ACL plus replacement lock, and rejects invalid request lengths before multipart parsing. Batch C remains blocked pending SOL G2 PASS on the new exact review head.
 
-**Batch B security remediation commit:** Pending remediation commit creation
+**Batch B security remediation commit:** `16d3e1a3baf0c1af982cd672bd0d1ecd1c4e0e3a`
 
 ## Planning recommendation
 
