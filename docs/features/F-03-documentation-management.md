@@ -209,7 +209,7 @@ SOL review `5695041394` required security remediation at `47e1a12b9000e6e3b79574
 **Baseline:** `ea47fe4f0d6a4555cb9ac449654910afc61ae318`
 **SOL Batch B G2:** PASS, review `5695573969`
 **Status:** Implemented and tested; pending SOL G2 exact-head review
-**Implementation commit:** Pending commit creation
+**Implementation commit:** `6b2d3fd75f5e729c7d3b487c3b74d657fe1dd8b8`
 
 Batch C adds deterministic native-MySQL job claiming, 60-second leases and 20-second heartbeats, three bounded attempts with 5/30-second retry delays, cancellation and stale-worker fencing, a Django-managed worker, Windows Job Object-isolated PDF/TXT/Markdown extraction, private normalized text artifacts, and transactional candidate publication. It adds no document-content API/UI, download route, operator recovery command, retrieval/chunking/embedding behavior, ADR-001 change, or IC-024 change.
 

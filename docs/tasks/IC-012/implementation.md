@@ -1,6 +1,6 @@
 # IC-012 Implementation Record
 
-**Batch C implementation commit:** Pending commit creation
+**Batch C implementation commit:** `6b2d3fd75f5e729c7d3b487c3b74d657fe1dd8b8`
 
 ## Implementation
 
