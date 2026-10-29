@@ -192,7 +192,7 @@ Living documents:
 **Baseline:** `fa76fe6044702447e38cb3aab38d0e4368ad5903`
 **SOL Batch A review:** PASS, review `5694518418`
 **Status:** Implemented and tested; submitted for SOL G2 exact-head review
-**Implementation commit:** Pending Batch B commit creation
+**Implementation commit:** `c368ca8ce392918f9d79287f54f45bad1918eba1`
 **Exact review head:** The full SHA of the final evidence commit is reported in the handoff/PR.
 
 Batch B adds bounded PDF/TXT/Markdown multipart creation, private opaque filesystem storage, original-artifact integrity metadata, initial queued version/job creation, guarded candidate assignment, critical upload audit, and filesystem/database compensation. It introduces no download/list/detail API, extraction worker, job claiming, frontend UI, reconciliation command, or F-04 behavior.

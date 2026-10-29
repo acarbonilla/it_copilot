@@ -14,8 +14,8 @@
 | Final `manage.py test -v 1` | PASS - complete 161/161 native MySQL backend suite after route inventory correction and final cleanup-hardening test |
 | `python -m pip check` | PASS - no broken requirements |
 | `manage.py check` | PASS |
-| `npm run validate` | Pending final repository evidence commit |
-| `git diff --check origin/main..HEAD` | Pending final repository evidence commit |
+| `npm run validate` | PASS - structure and example-secret checks |
+| `git diff --check origin/main..HEAD` | PASS |
 
 ## Security and failure evidence
 
