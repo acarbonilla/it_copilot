@@ -3,9 +3,9 @@
 **Feature:** F-03 Documentation Management
 **Task range:** IC-009–IC-017
 **Planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
-**Status:** Consolidated proposal prepared; Product Owner ratification pending
+**Status:** Product Owner ratified with mandatory clarifications; clarifications finalized
 
-The requested definition set and recommended defaults are now presented in [F-03 Consolidated G1 Requirements Proposal](F-03-consolidated-g1-proposal.md). They remain proposals until an explicit Product Owner G1 decision.
+The requested definition set and recommended defaults are presented in [F-03 Consolidated G1 Requirements Proposal](F-03-consolidated-g1-proposal.md). The Product Owner ratified them at proposal SHA `5016a7b50edcfc8d67824e13bbb647a116fdbe79`; the document now includes the mandatory lifecycle, parser-isolation, and extracted-text protections required by SOL G1 review `5693795827`.
 
 ## Evidence of missing definitions
 

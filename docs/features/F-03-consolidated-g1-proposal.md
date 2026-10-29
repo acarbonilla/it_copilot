@@ -1,13 +1,15 @@
 # F-03 Consolidated G1 Requirements Proposal
 
-**Proposal status:** Proposed for a single Product Owner G1 decision; not yet authoritative
+**Status:** Product Owner ratified with mandatory SOL clarifications finalized
 **Feature:** F-03 - Documentation Management
 **Task range:** IC-009 through IC-017
 **Proposal baseline:** `a96b396a2efe35713a549b7e4e3e7daf5d2f3c50`
 **Feature branch:** `feature/documentation-management`
 **SOL planning review:** PASS, review `5693729644`
+**SOL G1 review:** `5693795827`
+**Product Owner decision:** Ratified IC-009 through IC-017, Decisions 1-15, and bounded Batches A-E, subject to the four exact-head SOL G2 PASS boundaries
 
-Every task definition, decision, limit, and acceptance criterion in this document is a **proposal**. It becomes an implementation requirement only if the Product Owner ratifies this package and grants consolidated implementation authorization. Existing F-01/F-02 contracts remain authoritative where referenced.
+The task definitions, decisions, limits, and acceptance criteria originated as proposals at `5016a7b50edcfc8d67824e13bbb647a116fdbe79`. The Product Owner has ratified them with the lifecycle, parser-isolation, and extracted-text clarifications below. Existing F-01/F-02 contracts remain authoritative where referenced. F-03 implementation may proceed only batch-by-batch and must stop for SOL G2 PASS at each stated exact-head boundary.
 
 ## Proposed product boundary
 
@@ -28,7 +30,7 @@ F-03 does **not** provide semantic chunking for retrieval, embeddings, vector st
 | ID | Proposed criterion |
 | --- | --- |
 | IC-009-AC-01 | Forward Django migrations create document, document-version, processing-job, and extracted-text metadata structures with UUID identifiers, foreign keys, uniqueness/check constraints, and required indexes on native MySQL. |
-| IC-009-AC-02 | Lifecycle states are `UPLOADING`, `QUEUED`, `PROCESSING`, `READY`, `FAILED`, `ARCHIVED`, and `DELETED`; only the transition table in this proposal is accepted, and invalid transitions fail without partial state or audit writes. |
+| IC-009-AC-02 | Document visibility state is `ACTIVE`, `ARCHIVED`, or `DELETED`; each immutable version independently has processing state `STAGED`, `QUEUED`, `PROCESSING`, `READY`, `FAILED`, or `CANCELLED`. Only the finalized transition tables are accepted, and invalid transitions fail without partial state or audit writes. |
 | IC-009-AC-03 | A document has one immutable owner, a monotonically increasing metadata revision, one current binary version, timestamps, safe display metadata, and no user-controlled storage path. |
 | IC-009-AC-04 | Updating metadata requires the expected revision; stale updates return a generic conflict and do not overwrite newer data. |
 | IC-009-AC-05 | Archive is reversible; soft deletion is terminal to users and removes normal access immediately. Physical purge is an explicit maintenance/reconciliation action, not IC-024 account deletion. |
@@ -103,8 +105,8 @@ F-03 does **not** provide semantic chunking for retrieval, embeddings, vector st
 | --- | --- |
 | IC-013-AC-01 | A Django management command processes queued jobs without a public inbound endpoint and supports bounded one-shot and continuous local-development modes. |
 | IC-013-AC-02 | PDF, UTF-8 plain text, and UTF-8 Markdown produce normalized UTF-8 text, page count where applicable, character count, extractor/version identifier, and content digest. Markdown is treated as text; no embedded scripts, includes, remote resources, or macros execute. |
-| IC-013-AC-03 | Extracted text is capped at 2,000,000 characters; parsing is bounded by the accepted file/page limits and a 120-second job deadline. Limit breaches fail safely and publish no partial current result. |
-| IC-013-AC-04 | Output is written to a version-specific staging result and becomes current only in a transaction that revalidates job ownership, lease, document version, and lifecycle. |
+| IC-013-AC-03 | Extracted text is capped at 2,000,000 characters. Parsing runs in a separately spawned, killable child process with a hard 120-second wall-clock deadline and a 512 MiB private-memory ceiling. On supported Windows local execution, a Job Object contains the parser process tree and enforces memory and kill-on-close; deadline expiry terminates the whole job and waits for exit. If isolation or limits cannot be established, processing fails closed before parsing. A timeout checked only after parser return is noncompliant. |
+| IC-013-AC-04 | Output is written to a version-specific private staging artifact and becomes current only in a transaction that revalidates job ownership, lease, document version, document visibility, and current-version relationship. Extracted and staged text are document content, never public metadata. |
 | IC-013-AC-05 | Logs and audit records contain only controlled IDs, states, counts, durations, and safe error codes; no document text, filename, storage path, parser exception, or unrestricted metadata is logged. |
 | IC-013-AC-06 | Missing/corrupt artifacts, parser crashes, timeouts, worker termination, stale leases, and database failure follow the retry/failure contract and preserve the last valid result. |
 | IC-013-AC-07 | Unit, integration, artifact-failure, transaction-rollback, idempotence, and multi-worker tests pass, including synthetic secret scanning of logs. |
@@ -221,20 +223,39 @@ Legend: `Own` = owned documents only; `All` = all documents; `Meta` = non-conten
 ## Proposed lifecycle and recovery contract
 
 ```text
-UPLOAD BEGIN -> UPLOADING -> QUEUED -> PROCESSING -> READY
-                      |          |          |          |
-                      +----------+----------+--------> FAILED
+Document visibility (independent of version processing):
+ACTIVE <-> ARCHIVED
+ACTIVE or ARCHIVED -> DELETED (terminal)
 
-READY or FAILED <-> ARCHIVED
-Any non-deleted state -> DELETED (terminal to user/API)
-FAILED current version -> explicit authorized retry -> QUEUED
+Immutable version processing:
+STAGED -> QUEUED -> PROCESSING -> READY
+   |         |          |          |
+   +---------+----------+--------> FAILED
+             +----------+--------> CANCELLED
+FAILED or CANCELLED -> explicit authorized retry creates a new job -> QUEUED
 ```
 
-- Upload does not become visible as usable content until artifact persistence, database record, audit, and enqueue succeed under the compensation protocol.
-- A new binary upload creates an immutable version; it never overwrites an artifact in place.
-- The previously accepted result remains current until the new version succeeds. If the new version fails, its failure is visible but no partial result replaces the prior result.
-- Soft deletion immediately denies normal access and cancels/prevents processing. Physical purge is delayed 30 days and is explicitly executed through IC-016.
-- Database backup and the artifact root are one recovery set. The documented checkpoint records database transaction position/time plus artifact snapshot identity; restoring only one side requires reconciliation before service use.
+- Upload does not become a usable version until original-artifact persistence, database record, audit, and enqueue succeed under the compensation protocol. `STAGED` is internal and is not downloadable.
+- A replacement upload creates an immutable version and job; it never overwrites an artifact or prior extracted result. The document records a candidate version separately from its current successful version.
+- Only successful publication may promote the candidate version to current. Promotion revalidates the lease owner, job attempt, version, document `ACTIVE` state, authorization-independent deletion fence, and candidate relationship in one transaction.
+- A failed/cancelled replacement remains diagnostic metadata for authorized users but does not displace the older successful current version. Explicit retry acts on that immutable replacement version.
+- Archiving changes only document visibility: it denies ordinary mutation/processing triggers and prevents new worker claims, but preserves versions. Restore returns the document to `ACTIVE`; queued work is not silently restarted and requires an explicit retry/resume action.
+- Deletion atomically sets `DELETED`, cancels nonterminal jobs where possible, and fences every later claim/completion/publication. It immediately denies metadata, original artifacts, extracted text, and staged results through normal APIs.
+- Job cancellation moves `PENDING`/`RETRY_WAIT` to `CANCELLED` directly or records a cancellation request for `RUNNING`; a running worker must revalidate before publication. Cancellation never changes the current successful version.
+- A stale worker may write only to its private attempt staging area. It cannot publish after lease loss, archive, deletion, cancellation, candidate replacement, or job-attempt supersession; rejected staging artifacts are removed or quarantined by reconciliation.
+- An older successful version is always reached through the parent document policy. It cannot bypass the document's current authorization, `ARCHIVED`, or `DELETED` state by direct version/artifact identifier.
+- Soft deletion immediately denies normal access. Physical purge is delayed 30 days and explicitly executed through IC-016 for original artifacts, extracted text, staged results, and version metadata subject to audit/tombstone retention.
+- Database backup, original-artifact storage, extracted-text storage, and any retained staging/quarantine roots are one recovery set. The checkpoint records database transaction position/time plus artifact snapshot identity; restoring only one side requires reconciliation before service use.
+
+## Finalized parser isolation and sensitive-text contract
+
+- The worker process never invokes a document parser in-process. Each attempt spawns a fresh parser child with only the input artifact, format, output staging location, and numeric limits; it receives no session, user, audit, or database credentials.
+- On Windows, the parent creates and assigns the parser child to a Windows Job Object before allowing parsing to proceed. The Job Object sets kill-on-close and a 512 MiB process memory limit. The parent enforces a monotonic 120-second wall-clock deadline, terminates the Job Object on expiry, and waits for the process tree to exit before marking timeout. Parser grandchildren inherit containment.
+- CPU time is bounded by the wall-clock deadline; input remains limited to 10 MiB/500 PDF pages and output to 2,000,000 characters. The child receives a private per-attempt directory and no network-dependent behavior. Unsupported platforms or inability to establish containment fail closed unless a separately reviewed equivalent isolation adapter is implemented.
+- Extracted text, partial text, and staged results are document content. They use opaque server-generated storage keys under non-served private roots, path-containment/exclusive-creation controls, least-privilege access, integrity metadata, and attachment-equivalent backup/reconciliation rules.
+- Every read of extracted text or staged content is service-mediated through the parent document's current authorization and visibility state. App Admin has no implicit access. Direct storage keys, old versions, and worker identifiers confer no authority.
+- Staging content is attempt-scoped and is atomically promoted only after all publication fences pass. Failure, timeout, cancellation, or stale publication removes it or moves it to controlled quarantine without logging its contents or path.
+- Extracted/staged content follows document archive, deletion, 30-day purge eligibility, backup, restore, reconciliation, and audit restrictions. Logs, audit events, exceptions, metrics, SSR, URLs, and browser storage must never contain extracted text or sensitive filenames.
 
 ## Proposed bounded implementation batches
 
@@ -266,12 +287,12 @@ Any failed security, migration, concurrency, rollback, or scope check stops cons
 - Synthetic document-content and filename markers scanned across database audit fields, server/worker/Next.js logs, SSR output, URLs, browser storage, and browser console.
 - `npm run validate`, `git diff --check`, model-drift checks, task/feature documentation inventory, and exact-SHA evidence at each batch boundary.
 
-## Ratification choices
+## Ratification record
 
-The Product Owner may:
+The Product Owner selected **RATIFIED WITH MANDATORY CLARIFICATIONS** at authorized proposal SHA `5016a7b50edcfc8d67824e13bbb647a116fdbe79`. This finalized baseline resolves the three SOL requirements without expanding product scope or weakening a security control:
 
-1. **RATIFY AS PROPOSED** - IC-009 through IC-017 and Decisions 1-15 become the consolidated G1 requirements baseline, eligible for one bounded implementation authorization with the G2 stops above.
-2. **RATIFY WITH ENUMERATED CHANGES** - list exact task/decision changes; Codex updates this proposal before implementation.
-3. **HOLD** - no F-03 application implementation begins.
+1. document visibility and immutable-version processing are separate state machines with explicit archive, restore, delete, replacement, cancellation, and stale-publication behavior;
+2. parser deadline and memory limits are enforced by a killable isolated child/process tree, not a post-return timer; and
+3. extracted and staged text receive the same content authorization, App Admin isolation, private storage, retention, purge, backup, reconciliation, and logging protections as original artifacts.
 
-Until one of the first two choices is recorded, this document remains a proposal and no application code, migration, storage operation, or worker implementation is authorized.
+Batch A (IC-009 and IC-010) is authorized. Work must stop for SOL G2 review at the exact Batch A head before Batch B begins.
