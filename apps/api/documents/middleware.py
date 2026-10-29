@@ -13,7 +13,15 @@ class DocumentUploadSizeMiddleware:
             try:
                 content_length = int(request.META.get("CONTENT_LENGTH", ""))
             except (TypeError, ValueError):
-                content_length = -1
+                return JsonResponse(
+                    {"error": {"code": "invalid_upload", "message": "Document upload is invalid"}},
+                    status=400,
+                )
+            if content_length <= 0:
+                return JsonResponse(
+                    {"error": {"code": "invalid_upload", "message": "Document upload is invalid"}},
+                    status=400,
+                )
             if content_length > settings.DOCUMENT_MAX_REQUEST_BYTES:
                 return JsonResponse(
                     {"error": {"code": "request_too_large", "message": "Document upload is too large"}},

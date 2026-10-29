@@ -2,6 +2,7 @@
 
 **Batch:** F-03 Batch B
 **Implementation commit:** `c368ca8ce392918f9d79287f54f45bad1918eba1`
+**SOL G2 remediation commit:** Pending remediation commit creation
 
 ## Implementation
 
@@ -31,3 +32,12 @@ Django generated the audit migration name while replacing the controlled action 
 3. Within one MySQL transaction create document, version, artifact metadata, pending job, candidate reference, and critical audit events.
 4. On any exception, roll back MySQL and remove the provisional artifact.
 5. If removal fails, atomically move it to private quarantine; if both operations fail, raise a reconciliation-required error while leaving no database-visible document.
+
+## SOL G2 security remediation
+
+- Moved all pypdf import and parsing into a dedicated child protocol. The child blocks on stdin until the parent assigns it to a Windows Job Object.
+- The Job Object uses kill-on-close, a 512 MiB job-wide memory ceiling, and a two-process maximum required by the Windows virtual-environment redirector. The parent enforces the configured 120-second wall deadline and terminates/waits for the whole job on expiry.
+- The private artifact path is passed after containment via stdin rather than command-line arguments. Child stderr is discarded, stdout is bounded to the small JSON protocol, and infrastructure failure maps to a generic upload failure.
+- Added fail-closed Windows ACL establishment and verification. Inheritance is removed and exactly the current service SID plus SYSTEM receive explicit full control.
+- Added a directory handle opened without delete sharing, preventing replacement/deletion of the configured root while the store is active.
+- Changed request-size middleware to reject missing, malformed, zero, negative, and oversized `Content-Length` before CSRF or multipart parsing.

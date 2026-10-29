@@ -6,13 +6,12 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
-from pypdf import PdfReader
-
 from accounts.models import User
 from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event, record_denied_event_best_effort
 
 from .models import Document, DocumentVersion, OriginalArtifact, ProcessingJob
+from .pdf_isolation import PdfIsolationFailure, PdfPreflightRejected, run_isolated_pdf_preflight
 from .policies import DocumentCapability, authorize_document
 from .storage import ArtifactStorageError, ArtifactTooLarge, PrivateArtifactStore
 
@@ -78,39 +77,11 @@ def _safe_display_filename(name):
 
 def _validate_pdf(path):
     try:
-        with path.open("rb") as source:
-            if source.read(5) != b"%PDF-":
-                raise InvalidUpload
-            source.seek(0)
-            reader = PdfReader(source, strict=True)
-            if reader.is_encrypted:
-                raise InvalidUpload
-            page_count = len(reader.pages)
-            root = reader.trailer.get("/Root")
-            if root:
-                root = root.get_object()
-                if any(key in root for key in ("/OpenAction", "/AA")):
-                    raise InvalidUpload
-                names = root.get("/Names")
-                if names:
-                    names = names.get_object()
-                    if any(key in names for key in ("/JavaScript", "/EmbeddedFiles")):
-                        raise InvalidUpload
-            for page in reader.pages:
-                if any(key in page for key in ("/AA", "/OpenAction")):
-                    raise InvalidUpload
-                annotations = page.get("/Annots") or ()
-                for annotation in annotations:
-                    annotation = annotation.get_object()
-                    if annotation.get("/Subtype") in {"/FileAttachment", "/RichMedia"}:
-                        raise InvalidUpload
-                    action = annotation.get("/A")
-                    if action and action.get_object().get("/S") in {"/JavaScript", "/Launch", "/SubmitForm", "/ImportData"}:
-                        raise InvalidUpload
-    except InvalidUpload:
-        raise
-    except Exception as exc:
+        page_count = run_isolated_pdf_preflight(path)
+    except PdfPreflightRejected as exc:
         raise InvalidUpload from exc
+    except PdfIsolationFailure as exc:
+        raise UploadFailed from exc
     if page_count < 1 or page_count > settings.DOCUMENT_MAX_PDF_PAGES:
         raise InvalidUpload
 

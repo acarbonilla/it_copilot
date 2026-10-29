@@ -23,6 +23,7 @@ class DocumentUploadServiceTests(TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name) / "private"
         self.store = PrivateArtifactStore(self.root)
+        self.addCleanup(self.store.close)
         self.owner = User.objects.create_user("owner-upload@example.test", None, it_role=User.ITRole.IT_MEMBER)
 
     def upload(self, *, name="runbook.txt", content=b"private runbook", content_type="text/plain"):

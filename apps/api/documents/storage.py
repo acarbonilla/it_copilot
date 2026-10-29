@@ -64,6 +64,19 @@ class PrivateArtifactStore:
             if resolved == public_root or resolved.is_relative_to(public_root):
                 raise ImproperlyConfigured("Private document storage cannot be inside a served directory")
         self._resolved_root = resolved
+        from .windows_acl import enforce_and_verify_private_acl, lock_directory_against_replacement
+
+        self.allowed_acl_sids = enforce_and_verify_private_acl(self.root)
+        self._root_lock = lock_directory_against_replacement(self.root)
+
+    def close(self):
+        lock = getattr(self, "_root_lock", None)
+        if lock:
+            lock.close()
+            self._root_lock = None
+
+    def __del__(self):
+        self.close()
 
     def _assert_private_path(self, path, *, require_exists=False):
         candidate = path.resolve(strict=require_exists)
