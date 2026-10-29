@@ -6,6 +6,8 @@ ACTION_VALUES = (
     "auth.login_success",
     "auth.login_denied",
     "account.invite_created",
+    "account.invite_revoked",
+    "account.invite_reissued",
     "account.activation_succeeded",
     "account.activation_denied",
     "account.deactivated",
@@ -23,6 +25,8 @@ class SecurityAuditEvent(models.Model):
         AUTH_LOGIN_SUCCESS = "auth.login_success", "Authentication login succeeded"
         AUTH_LOGIN_DENIED = "auth.login_denied", "Authentication login denied"
         ACCOUNT_INVITE_CREATED = "account.invite_created", "Account invitation created"
+        ACCOUNT_INVITE_REVOKED = "account.invite_revoked", "Account invitation revoked"
+        ACCOUNT_INVITE_REISSUED = "account.invite_reissued", "Account invitation reissued"
         ACCOUNT_ACTIVATION_SUCCEEDED = "account.activation_succeeded", "Account activation succeeded"
         ACCOUNT_ACTIVATION_DENIED = "account.activation_denied", "Account activation denied"
         ACCOUNT_DEACTIVATED = "account.deactivated", "Account deactivated"

@@ -57,7 +57,7 @@ def _delivery_file(invitation, *, email, token):
     destination = (mailbox_root / f"{invitation.pk}.json").resolve()
     if destination.parent != mailbox_root:
         raise ImproperlyConfigured("Invitation mailbox path escaped its configured root")
-    activation_url = f"{settings.INVITATION_ACTIVATION_BASE_URL.rstrip('/')}/{token}"
+    activation_url = f"{settings.INVITATION_ACTIVATION_BASE_URL.rstrip('/')}#token={token}"
     created = False
     try:
         descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -92,6 +92,12 @@ def create_or_reissue_invitation(*, actor, email, it_role, is_app_admin):
     artifact = None
     try:
         with transaction.atomic():
+            # Invitation replacement and legacy remediation can target the same
+            # pending account. Serialize both through the lifecycle guard before
+            # either path locks or mutates the user/invitation rows.
+            from .lifecycle import _lock_guard
+
+            _lock_guard()
             try:
                 user = User.objects.select_for_update().get(email=normalized_email)
             except User.DoesNotExist:
@@ -130,6 +136,7 @@ def create_or_reissue_invitation(*, actor, email, it_role, is_app_admin):
                 token_digest=_token_digest(token),
                 expires_at=now + timedelta(hours=settings.INVITATION_TOKEN_TTL_HOURS),
                 invited_by_user_id=actor.pk,
+                delivery_format=AccountInvitation.DeliveryFormat.FRAGMENT_V1,
             )
             record_critical_event(
                 action=SecurityAuditEvent.Action.ACCOUNT_INVITE_CREATED,

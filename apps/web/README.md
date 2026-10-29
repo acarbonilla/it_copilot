@@ -20,16 +20,14 @@ identifiers, or CSRF values in browser storage.
 
 ## Activation-token boundary
 
-The IC-006 link uses `/activate/[token]`, so the initial local HTTP request and
-Next.js server receive the token in the path. Next.js serializes the token in
-the client-component hydration payload even though it is not rendered as
-visible text. After hydration, the form replaces the browser history URL with
-the tokenless `/activate` fallback; after success it replaces that entry with
-`/login`. `Referrer-Policy: no-referrer` and the absence of third-party assets
-prevent outgoing referrer disclosure.
+F02-SEC-001 delivers links as `/activate#token=<secret>`. URL fragments are not
+sent in HTTP requests or server-rendered props. The client reads and scrubs the
+fragment before rendering the activation form, keeps the token only in memory,
+and replaces the URL with `/login` after success. `Referrer-Policy: no-referrer`
+provides defense in depth.
 
-These mitigations do not remove the initial URL from browser network/devtools,
-the server-rendered response source, process memory, or upstream access logs.
-The flow is therefore local-MVP only. Do not enable request-path logging for
-activation URLs, and require explicit redaction before any hosted deployment.
+The former `/activate/[token]` route no longer exists. A request proxy returns a
+constant token-free 404 response for legacy paths, and development request
+logging ignores those paths to avoid reflecting old secrets. Do not place
+activation tokens in browser storage, telemetry, audit records, or logs.
 

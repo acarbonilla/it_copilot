@@ -43,7 +43,8 @@ class InvitationServiceTests(TransactionTestCase):
         invitation = create_or_reissue_invitation(**fields)
         artifact = Path(self.mailbox.name) / f"{invitation.pk}.json"
         delivery = json.loads(artifact.read_text(encoding="utf-8"))
-        token = delivery["activation_url"].rsplit("/", 1)[-1]
+        self.assertEqual(delivery["activation_url"].split("#", 1)[0], "http://localhost:3000/activate")
+        token = delivery["activation_url"].split("#token=", 1)[1]
         return invitation, token, artifact
 
     def test_invitation_creates_pending_user_digest_only_delivery_and_atomic_audit(self):
@@ -54,6 +55,7 @@ class InvitationServiceTests(TransactionTestCase):
         self.assertFalse(user.is_active)
         self.assertFalse(user.has_usable_password())
         self.assertTrue(user.is_app_admin)
+        self.assertEqual(invitation.delivery_format, AccountInvitation.DeliveryFormat.FRAGMENT_V1)
         self.assertEqual(user.lifecycle_state, User.LifecycleState.PENDING_INVITATION)
         self.assertAlmostEqual((invitation.expires_at - invitation.created_at).total_seconds(), 24 * 60 * 60, delta=1)
         self.assertNotEqual(invitation.token_digest, token)
