@@ -1,10 +1,12 @@
 # F-03 — Documentation Management
 
-**Status:** Planned — authoritative task definitions required before G1 specifications
+**Status:** Consolidated G1 requirements proposed; Product Owner ratification pending
 **Branch:** `feature/documentation-management`
 **Verified planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
 **Product Owner authorization:** Planning, investigation, feature-branch preparation, and task specification only
-**SOL reviewer:** Pending
+**SOL planning review:** PASS, review `5693729644`
+
+The single ratifiable proposal is [F-03 Consolidated G1 Requirements Proposal](F-03-consolidated-g1-proposal.md). Every task definition and decision there is explicitly proposed rather than represented as an existing authoritative requirement.
 
 ## Scope and source status
 
@@ -46,7 +48,7 @@ Excluded until separately specified: F-04 Copilot/retrieval behavior, external A
 | IC-016 | Not present | Not present | Blocked pending source definition |
 | IC-017 | Not present | Not present | Blocked pending source definition |
 
-Until the definitions are supplied, task specifications and four-document task folders must not claim G1 readiness.
+Until the consolidated proposal is ratified or replacement definitions are supplied, task specifications and four-document task folders must not claim G1 approval.
 
 ## Dependency graph
 
@@ -164,4 +166,4 @@ Product Owner/SOL resolution is required for:
 
 ## Planning recommendation
 
-**HOLD implementation; READY for SOL planning review and Product Owner requirements resolution.** The repository supports a bounded architecture and security analysis, but not truthful task-level specifications for IC-009–IC-017. Supply or ratify the missing definitions, then approve a consolidated implementation batch.
+**HOLD implementation; READY for consolidated SOL/Product Owner G1 review.** The repository did not contain authoritative task definitions. The linked package now proposes a complete mapping and decision sheet without presenting it as pre-existing authority. Ratification and consolidated implementation authorization remain required before code.

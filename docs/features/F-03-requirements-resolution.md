@@ -3,7 +3,9 @@
 **Feature:** F-03 Documentation Management
 **Task range:** IC-009–IC-017
 **Planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
-**Status:** Awaiting authoritative task definitions and Product Owner decisions
+**Status:** Consolidated proposal prepared; Product Owner ratification pending
+
+The requested definition set and recommended defaults are now presented in [F-03 Consolidated G1 Requirements Proposal](F-03-consolidated-g1-proposal.md). They remain proposals until an explicit Product Owner G1 decision.
 
 ## Evidence of missing definitions
 
@@ -29,7 +31,7 @@ For each task code, provide or approve:
 
 ## Resolution gate
 
-The Product Owner may either supply the original authoritative IC-009–IC-017 definitions or explicitly ratify a proposed decomposition derived from the conditional workstreams in the feature record. SOL should verify cross-task dependency and security boundaries before consolidated implementation authorization.
+The Product Owner may either supply original authoritative IC-009–IC-017 definitions or explicitly ratify the consolidated proposal. SOL should verify the proposed task mapping, decision matrix, cross-task dependencies, security boundaries, and objective G2 stops before consolidated implementation authorization.
 
 Until that gate completes:
 
