@@ -1,7 +1,7 @@
 # F02-SEC-001 — Review
 
 **Gate:** G2 locking finding remediated; fresh SOL review requested
-**Merge:** Prohibited; PR targets `feature/identity-administration` only  
+**Merge:** Prohibited; PR targets `feature/identity-administration` only
 **Date:** 2026-10-29
 
 ## SOL review focus

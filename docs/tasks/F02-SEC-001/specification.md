@@ -1,8 +1,8 @@
 # F02-SEC-001 — Activation Token Exposure Remediation
 
 **Status:** G1 approved; implementation authorized; G2 locking remediation complete, re-review requested
-**Feature:** F-02 Identity & Administration  
-**Baseline:** `c5aca48438b7aaca3b67c3fbb4753c432d7631ae`  
+**Feature:** F-02 Identity & Administration
+**Baseline:** `c5aca48438b7aaca3b67c3fbb4753c432d7631ae`
 **Updated:** 2026-10-29
 
 **G2 remediation:** SOL identified that ordinary invitation creation/reissue locked the target user without first acquiring `AdminLifecycleGuard`, while legacy remediation used guard-first locking. All invitation replacement paths now use the common guard-first protocol. A native MySQL race between ordinary re-invitation and legacy remediation is required evidence for re-review.

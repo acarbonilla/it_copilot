@@ -1,6 +1,6 @@
 # F02-SEC-001 — Implementation
 
-**Date:** 2026-10-29  
+**Date:** 2026-10-29
 **Branch:** `fix/f02-sec-001-activation-token-exposure`
 
 ## Implemented design
