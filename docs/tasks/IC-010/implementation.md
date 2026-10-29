@@ -2,7 +2,7 @@
 
 **Batch:** F-03 Batch A
 **Implementation commit:** `494973c3ed493ce4b484dd819f41a3c9fa4f5277`
-**SOL G2 remediation commit:** Pending remediation commit creation
+**SOL G2 remediation commit:** `bfcb5f7f9734a579d4089ec8142a835a990d30f4`
 
 ## Implementation
 

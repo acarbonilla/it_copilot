@@ -179,7 +179,7 @@ Batch A adds the `documents` Django domain app, native MySQL schema foundations,
 
 SOL review `5694183813` required a Batch A correction at head `98cdb657bffc1807873be959b37223ba39fcec31`. The remediation unifies locked resolution of cross-owner/missing/deleted documents, reloads actor lifecycle/role state, removes probed identifiers from denial audits, and rejects cross-document current/candidate version references. Updated native MySQL focused and full-regression evidence is recorded in the IC-009 and IC-010 living documents. Batch B remains blocked pending SOL G2 PASS on the new exact head.
 
-**Batch A remediation implementation commit:** Pending remediation commit creation
+**Batch A remediation implementation commit:** `bfcb5f7f9734a579d4089ec8142a835a990d30f4`
 
 Living documents:
 
