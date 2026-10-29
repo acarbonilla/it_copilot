@@ -20,6 +20,7 @@ ACTION_VALUES = (
     "document.archived",
     "document.restored",
     "document.deleted",
+    "document.upload_created",
 )
 TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource")
 OUTCOME_VALUES = ("success", "denied", "failure")
@@ -44,6 +45,7 @@ class SecurityAuditEvent(models.Model):
         DOCUMENT_ARCHIVED = "document.archived", "Document archived"
         DOCUMENT_RESTORED = "document.restored", "Document restored"
         DOCUMENT_DELETED = "document.deleted", "Document deleted"
+        DOCUMENT_UPLOAD_CREATED = "document.upload_created", "Document upload created"
 
     class TargetType(models.TextChoices):
         ACCOUNT = "account", "Account"

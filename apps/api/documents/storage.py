@@ -1,0 +1,141 @@
+import hashlib
+import os
+import re
+import stat
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
+
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
+
+
+_STORAGE_KEY = re.compile(r"^originals/[0-9a-f]{2}/[0-9a-f]{32}\.bin$")
+
+
+class ArtifactStorageError(Exception):
+    pass
+
+
+class ArtifactTooLarge(ArtifactStorageError):
+    pass
+
+
+@dataclass(frozen=True)
+class StoredArtifact:
+    storage_key: str
+    sha256_digest: str
+    byte_length: int
+
+
+def _is_reparse_point(path):
+    details = path.lstat()
+    return stat.S_ISLNK(details.st_mode) or bool(
+        getattr(details, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    )
+
+
+class PrivateArtifactStore:
+    def __init__(self, root=None):
+        configured = Path(root if root is not None else settings.DOCUMENT_PRIVATE_STORAGE_ROOT)
+        if not configured.is_absolute():
+            configured = settings.REPOSITORY_DIR / configured
+        self.root = configured.absolute()
+        self._prepare_root()
+
+    def _prepare_root(self):
+        self.root.mkdir(parents=True, exist_ok=True)
+        if not self.root.is_dir() or _is_reparse_point(self.root):
+            raise ImproperlyConfigured("Private document storage root must be a real directory")
+        current = Path(self.root.anchor)
+        for part in self.root.parts[1:]:
+            current = current / part
+            if current.exists() and _is_reparse_point(current):
+                raise ImproperlyConfigured("Private document storage path cannot contain a reparse point")
+        resolved = self.root.resolve(strict=True)
+        forbidden = (
+            settings.REPOSITORY_DIR / "apps" / "web" / "public",
+            settings.API_DIR / "media",
+            settings.API_DIR / "static",
+            settings.API_DIR / "staticfiles",
+        )
+        for public_root in forbidden:
+            public_root = public_root.absolute()
+            if resolved == public_root or resolved.is_relative_to(public_root):
+                raise ImproperlyConfigured("Private document storage cannot be inside a served directory")
+        self._resolved_root = resolved
+
+    def _assert_private_path(self, path, *, require_exists=False):
+        candidate = path.resolve(strict=require_exists)
+        if candidate == self._resolved_root or not candidate.is_relative_to(self._resolved_root):
+            raise ArtifactStorageError("Artifact path escaped private storage")
+        current = self.root
+        relative = path.absolute().relative_to(self.root)
+        parts = relative.parts if require_exists else relative.parts[:-1]
+        for part in parts:
+            current = current / part
+            if current.exists() and _is_reparse_point(current):
+                raise ArtifactStorageError("Artifact path contains a reparse point")
+        return candidate
+
+    def write_upload(self, uploaded_file):
+        artifact_id = uuid.uuid4().hex
+        storage_key = f"originals/{artifact_id[:2]}/{artifact_id}.bin"
+        destination = self.root / Path(*storage_key.split("/"))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        self._assert_private_path(destination)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+        descriptor = None
+        byte_length = 0
+        digest = hashlib.sha256()
+        try:
+            descriptor = os.open(destination, flags, 0o600)
+            with os.fdopen(descriptor, "wb") as artifact:
+                descriptor = None
+                for chunk in uploaded_file.chunks():
+                    if not isinstance(chunk, bytes):
+                        chunk = bytes(chunk)
+                    byte_length += len(chunk)
+                    if byte_length > settings.DOCUMENT_MAX_FILE_BYTES:
+                        raise ArtifactTooLarge("Upload exceeds the configured file limit")
+                    digest.update(chunk)
+                    artifact.write(chunk)
+                artifact.flush()
+                os.fsync(artifact.fileno())
+            if byte_length == 0:
+                raise ArtifactStorageError("Empty artifacts are not accepted")
+            self._assert_private_path(destination, require_exists=True)
+            return StoredArtifact(storage_key, digest.hexdigest(), byte_length)
+        except Exception as original_error:
+            if descriptor is not None:
+                os.close(descriptor)
+            try:
+                destination.unlink(missing_ok=True)
+            except OSError:
+                try:
+                    self.quarantine(storage_key)
+                except Exception as cleanup_error:
+                    raise ArtifactStorageError("Partial private artifact requires reconciliation") from cleanup_error
+            raise original_error
+
+    def resolve(self, storage_key):
+        if not isinstance(storage_key, str) or not _STORAGE_KEY.fullmatch(storage_key):
+            raise ArtifactStorageError("Artifact identifier is invalid")
+        path = self.root / Path(*storage_key.split("/"))
+        self._assert_private_path(path, require_exists=True)
+        if not path.is_file() or _is_reparse_point(path):
+            raise ArtifactStorageError("Artifact is not a private regular file")
+        return path
+
+    def delete(self, storage_key):
+        path = self.resolve(storage_key)
+        path.unlink()
+
+    def quarantine(self, storage_key):
+        source = self.resolve(storage_key)
+        quarantine_root = self.root / "quarantine"
+        quarantine_root.mkdir(parents=True, exist_ok=True)
+        destination = quarantine_root / f"{uuid.uuid4().hex}.orphan"
+        self._assert_private_path(destination)
+        os.replace(source, destination)
+        return destination

@@ -3,6 +3,7 @@ from django.urls import path
 from accounts.invitation_views import ActivationView, InvitationCreateView
 from accounts.lifecycle_views import DeactivateUserView, DeletionReviewView, ReactivateUserView, UserDetailView, UserListView
 from health.views import HealthView
+from documents.views import DocumentUploadView
 from session_auth.views import CsrfView, LoginView, LogoutView, MeView
 
 urlpatterns = [
@@ -18,5 +19,6 @@ urlpatterns = [
     path("api/v1/users/<int:user_id>/deactivate", DeactivateUserView.as_view(), name="user-deactivate"),
     path("api/v1/users/<int:user_id>/reactivate", ReactivateUserView.as_view(), name="user-reactivate"),
     path("api/v1/users/<int:user_id>/deletion-reviews", DeletionReviewView.as_view(), name="user-deletion-review"),
+    path("api/v1/documents", DocumentUploadView.as_view(), name="document-upload"),
 ]
 handler404 = "config.errors.structured_not_found"

@@ -186,6 +186,19 @@ Living documents:
 - [IC-009 specification](../tasks/IC-009/specification.md), [implementation](../tasks/IC-009/implementation.md), [test results](../tasks/IC-009/test-results.md), and [review](../tasks/IC-009/review.md)
 - [IC-010 specification](../tasks/IC-010/specification.md), [implementation](../tasks/IC-010/implementation.md), [test results](../tasks/IC-010/test-results.md), and [review](../tasks/IC-010/review.md)
 
+## Batch B implementation inventory
+
+**Task:** IC-011 Secure Upload and Private Artifact Storage
+**Baseline:** `fa76fe6044702447e38cb3aab38d0e4368ad5903`
+**SOL Batch A review:** PASS, review `5694518418`
+**Status:** Implemented and tested; submitted for SOL G2 exact-head review
+**Implementation commit:** Pending Batch B commit creation
+**Exact review head:** The full SHA of the final evidence commit is reported in the handoff/PR.
+
+Batch B adds bounded PDF/TXT/Markdown multipart creation, private opaque filesystem storage, original-artifact integrity metadata, initial queued version/job creation, guarded candidate assignment, critical upload audit, and filesystem/database compensation. It introduces no download/list/detail API, extraction worker, job claiming, frontend UI, reconciliation command, or F-04 behavior.
+
+Living documents: [IC-011 specification](../tasks/IC-011/specification.md), [implementation](../tasks/IC-011/implementation.md), [test results](../tasks/IC-011/test-results.md), and [review](../tasks/IC-011/review.md).
+
 ## Planning recommendation
 
 **HOLD implementation; READY for consolidated SOL/Product Owner G1 review.** The repository did not contain authoritative task definitions. The linked package now proposes a complete mapping and decision sheet without presenting it as pre-existing authority. Ratification and consolidated implementation authorization remain required before code.

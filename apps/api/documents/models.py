@@ -140,6 +140,20 @@ class ProcessingJob(models.Model):
         indexes = [models.Index(fields=("state", "available_at"), name="processing_job_claim_idx")]
 
 
+class OriginalArtifact(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document_version = models.OneToOneField(DocumentVersion, on_delete=models.CASCADE, related_name="original_artifact")
+    storage_key = models.CharField(max_length=255, unique=True, editable=False)
+    original_filename = models.CharField(max_length=255)
+    sha256_digest = models.CharField(max_length=64, editable=False)
+    byte_length = models.PositiveBigIntegerField()
+    detected_media_type = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(byte_length__gt=0), name="original_artifact_bytes_positive")]
+
+
 class ExtractedTextArtifact(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document_version = models.OneToOneField(DocumentVersion, on_delete=models.CASCADE, related_name="extracted_text_artifact")

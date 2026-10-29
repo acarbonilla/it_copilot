@@ -30,6 +30,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "documents.middleware.DocumentUploadSizeMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 ]
@@ -51,6 +52,13 @@ INVITATION_TOKEN_TTL_HOURS = 24
 INVITATION_DELIVERY_MODE = os.environ.get("INVITATION_DELIVERY_MODE", "disabled")
 INVITATION_MAILBOX_ROOT = Path(os.environ.get("INVITATION_MAILBOX_ROOT", REPOSITORY_DIR / "tmp" / "invitations"))
 INVITATION_ACTIVATION_BASE_URL = os.environ.get("INVITATION_ACTIVATION_BASE_URL", "http://localhost:3000/activate")
+
+DOCUMENT_MAX_FILE_BYTES = 10 * 1024 * 1024
+DOCUMENT_MAX_REQUEST_BYTES = 12 * 1024 * 1024
+DOCUMENT_MAX_PDF_PAGES = 500
+DOCUMENT_PRIVATE_STORAGE_ROOT = Path(
+    os.environ.get("DOCUMENT_PRIVATE_STORAGE_ROOT", REPOSITORY_DIR / "tmp" / "documents-private")
+)
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True

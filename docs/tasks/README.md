@@ -7,8 +7,9 @@
 | [IC-003](IC-003/specification.md) | Custom User Model and Roles | Verified and integrated into `feature/core-platform` via [PR #6](https://github.com/acarbonilla/it_copilot/pull/6) | SOL passed |
 | [IC-004](IC-004/specification.md) | Session Authentication and CSRF | Verified and integrated into `feature/core-platform` via [PR #7](https://github.com/acarbonilla/it_copilot/pull/7) | SOL passed |
 | [IC-005](IC-005/specification.md) | Next.js Shell and Login | Verified and integrated into `feature/core-platform` via [PR #8](https://github.com/acarbonilla/it_copilot/pull/8) | SOL passed |
-| [IC-009](IC-009/specification.md) | Document Domain and Lifecycle | Implemented on `feature/documentation-management`; Batch A exact-head review pending | Product Owner G1 ratified; SOL G2 pending |
-| [IC-010](IC-010/specification.md) | Document Authorization and Ownership | Implemented on `feature/documentation-management`; Batch A exact-head review pending | Product Owner G1 ratified; SOL G2 pending |
+| [IC-009](IC-009/specification.md) | Document Domain and Lifecycle | Implemented on `feature/documentation-management` | Product Owner G1 ratified; Batch A SOL G2 PASS `5694518418` |
+| [IC-010](IC-010/specification.md) | Document Authorization and Ownership | Implemented on `feature/documentation-management` | Product Owner G1 ratified; Batch A SOL G2 PASS `5694518418` |
+| [IC-011](IC-011/specification.md) | Secure Upload and Private Artifact Storage | Implemented on `feature/documentation-management`; Batch B exact-head review pending | Product Owner G1 ratified; SOL G2 pending |
 
 ## TTDM workflow amendment
 
