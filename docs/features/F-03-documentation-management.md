@@ -168,6 +168,20 @@ Product Owner/SOL resolution is required for:
 - Task PRs target this feature branch; no F-03 merge to `main` is authorized by planning approval.
 - The feature record will capture exact task heads, integration commits, test evidence, and recovery refs as implementation proceeds.
 
+## Batch A implementation inventory
+
+**Tasks:** IC-009 Document Domain and Lifecycle; IC-010 Document Authorization and Ownership
+**Status:** Implemented and tested; submitted for SOL G2 exact-head review
+**Implementation commit:** Pending Batch A commit creation
+**Exact review head:** Pending final evidence commit
+
+Batch A adds the `documents` Django domain app, native MySQL schema foundations, transactional lifecycle services, the shared document authorization policy, five controlled audit actions, and focused/full backend evidence. It does not add upload/storage I/O, worker execution, API routes, frontend screens, recovery commands, or F-04 behavior.
+
+Living documents:
+
+- [IC-009 specification](../tasks/IC-009/specification.md), [implementation](../tasks/IC-009/implementation.md), [test results](../tasks/IC-009/test-results.md), and [review](../tasks/IC-009/review.md)
+- [IC-010 specification](../tasks/IC-010/specification.md), [implementation](../tasks/IC-010/implementation.md), [test results](../tasks/IC-010/test-results.md), and [review](../tasks/IC-010/review.md)
+
 ## Planning recommendation
 
 **HOLD implementation; READY for consolidated SOL/Product Owner G1 review.** The repository did not contain authoritative task definitions. The linked package now proposes a complete mapping and decision sheet without presenting it as pre-existing authority. Ratification and consolidated implementation authorization remain required before code.
