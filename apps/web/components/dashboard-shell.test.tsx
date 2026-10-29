@@ -24,7 +24,7 @@ describe("DashboardShell", () => {
   it("shows administration only for App Admin without changing IT role", async () => {
     vi.spyOn(api, "currentUser").mockResolvedValue({ ...member, is_app_admin: true, it_role: "NONE" });
     render(<DashboardShell />);
-    expect(await screen.findByRole("heading", { name: "Administration" })).toBeVisible();
+    expect(await screen.findByRole("link", { name: "Administration" })).toHaveAttribute("href", "/admin/users");
   });
 
   it("redirects an anonymous user before rendering protected content", async () => {

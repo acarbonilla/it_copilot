@@ -32,9 +32,9 @@ export async function bootstrapCsrf(): Promise<string> {
   return csrfToken;
 }
 
-async function unsafeRequest<T>(path: string, body?: object): Promise<T> {
+async function unsafeRequest<T>(path: string, body?: object, method = "POST"): Promise<T> {
   const send = (token: string) => request<T>(path, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json", "X-CSRFToken": token },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -60,6 +60,26 @@ export async function currentUser(): Promise<UserIdentity> {
 export async function logout(): Promise<void> {
   await unsafeRequest<null>("/api/v1/auth/logout");
   csrfToken = null;
+}
+
+export async function activateAccount(token: string, password: string): Promise<void> {
+  await unsafeRequest<{ status: "activated" }>("/api/v1/auth/activate", { token, password });
+}
+
+export type ManagedUser = UserIdentity & { is_active: boolean; lifecycle_status: "active" | "pending_invitation" | "deactivated" | "inactive_legacy" };
+export type UserPage = { users: ManagedUser[]; pagination: { page: number; page_size: number; count: number; total_pages: number } };
+
+export async function listUsers(page = 1): Promise<UserPage> { return request<UserPage>(`/api/v1/users?page=${page}`); }
+export async function updateUser(id: number, changes: Pick<ManagedUser, "it_role" | "is_app_admin">): Promise<ManagedUser> {
+  return (await unsafeRequest<{ user: ManagedUser }>(`/api/v1/users/${id}`, changes, "PATCH")).user;
+}
+export async function deactivateUser(id: number): Promise<ManagedUser> { return (await unsafeRequest<{ user: ManagedUser }>(`/api/v1/users/${id}/deactivate`)).user; }
+export async function reactivateUser(id: number): Promise<ManagedUser> { return (await unsafeRequest<{ user: ManagedUser }>(`/api/v1/users/${id}/reactivate`)).user; }
+export async function requestDeletionReview(id: number, reason_code: "NO_LONGER_NEEDED" | "SECURITY_CONCERN" | "DUPLICATE_ACCOUNT"): Promise<void> {
+  await unsafeRequest(`/api/v1/users/${id}/deletion-reviews`, { reason_code });
+}
+export async function inviteUser(email: string, it_role: UserIdentity["it_role"], is_app_admin: boolean): Promise<void> {
+  await unsafeRequest("/api/v1/users/invitations", { email, it_role, is_app_admin });
 }
 
 export function resetApiStateForTests() { csrfToken = null; }

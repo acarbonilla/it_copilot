@@ -76,6 +76,13 @@ class MigrationGuardrailTests(SimpleTestCase):
                 "api/v1/auth/login",
                 "api/v1/auth/logout",
                 "api/v1/auth/me",
+                "api/v1/auth/activate",
+                "api/v1/users/invitations",
+                "api/v1/users",
+                "api/v1/users/<int:user_id>",
+                "api/v1/users/<int:user_id>/deactivate",
+                "api/v1/users/<int:user_id>/reactivate",
+                "api/v1/users/<int:user_id>/deletion-reviews",
             },
         )
 

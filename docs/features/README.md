@@ -10,7 +10,7 @@ Maintain **one feature-level record** per approved feature at `docs/features/<fe
 | --- | --- | --- | --- |
 | F-00 | Foundation | IC-001 | Merged under original TTDM workflow; documentation closeout separate |
 | F-01 | Core Platform | IC-002–IC-005 | **Feature Completed**; PO accepted; [PR #9](https://github.com/acarbonilla/it_copilot/pull/9) merged into `main`; [acceptance review](F-01-acceptance-review.md) |
-| F-02 | Identity & Administration | IC-006–IC-008; IC-024 deferred | [G0 planning approved](F-02-identity-administration.md); G1 specifications pending; implementation not authorized |
+| F-02 | Identity & Administration | IC-006–IC-008 plus F02-SEC-001; IC-024 deferred | [Final acceptance evidence complete](F-02-final-acceptance-review.md); SOL review and Product Owner final acceptance pending |
 | F-03 | Documentation Management | IC-009–IC-017 | Not started |
 | F-04 | Copilot | IC-018–IC-020 | Not started |
 | F-05 | Credentials Vault | IC-021–IC-023 | Not started |

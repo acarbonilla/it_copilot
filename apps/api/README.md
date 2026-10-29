@@ -63,3 +63,28 @@ Local HTTP uses HttpOnly/Lax session cookies and a browser-readable/Lax CSRF
 cookie. Set `DJANGO_COOKIE_SECURE=true` whenever the API is served over HTTPS;
 the committed default `false` is an explicit local-development exception.
 
+## Restricted local invitation mailbox
+
+IC-006 invitation delivery is disabled by default. For a controlled local
+development run only, set `DJANGO_DEBUG=true` and
+`INVITATION_DELIVERY_MODE=file`. The API then creates one mode-`0600` JSON file
+per invitation under the repository-ignored `tmp/invitations` directory by
+default. The filename is the nonsecret invitation UUID returned by the invite
+API; the file contains the recipient and local activation URL.
+
+Only the developer operating the local environment may read this directory.
+Do not serve, sync, commit, attach, log, or copy these files to shared storage.
+Delete an artifact after its activation succeeds, and clear stale/revoked files
+when the local verification session ends. Host filesystem ACLs remain the
+operator's responsibility, especially on Windows where POSIX mode bits are not
+an access-control boundary. Production-like runs must leave delivery disabled.
+
+The database and filesystem do not share a distributed transaction. The service
+removes a newly created artifact on write errors, transaction-body failures, and
+caught database commit failures; a filename collision never removes the file it
+found. A process or host crash after the write but before database commit can
+still leave an orphan file. Such a token has no committed digest and cannot
+activate an account, but the file remains sensitive local data and must be
+removed by the documented end-of-session cleanup. Conversely, filesystem loss
+after a successful database commit has no automatic redelivery mechanism.
+

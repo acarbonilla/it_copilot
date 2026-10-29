@@ -65,3 +65,7 @@ def can_access_private_web_document(user, *, owner_id):
 
 def can_access_credential_vault(user, *, owner_id):
     return can_access_private_resource(user, owner_id=owner_id)
+
+
+def can_invite_accounts(user):
+    return _active_user(user) and bool(getattr(user, "is_app_admin", False))
