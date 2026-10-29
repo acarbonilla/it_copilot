@@ -57,7 +57,7 @@ def _delivery_file(invitation, *, email, token):
     destination = (mailbox_root / f"{invitation.pk}.json").resolve()
     if destination.parent != mailbox_root:
         raise ImproperlyConfigured("Invitation mailbox path escaped its configured root")
-    activation_url = f"{settings.INVITATION_ACTIVATION_BASE_URL.rstrip('/')}/{token}"
+    activation_url = f"{settings.INVITATION_ACTIVATION_BASE_URL.rstrip('/')}#token={token}"
     created = False
     try:
         descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
