@@ -1,20 +1,22 @@
 # F-02 — Identity & Administration
 
-**Status:** Security remediation implementation complete; SOL exact-head review pending
+**Status:** Final acceptance evidence complete; SOL independent closeout review and Product Owner final acceptance pending
 
 **Feature branch:** `feature/identity-administration`
 
-**Verified feature head:** `98b294fb4a8d17d7d5b30c54d8ed86a9f9d93702`
+**Verified feature head:** `524c162290e4db0da954996fe2938dbbf27ca65a`
 
 **Verified main baseline:** `5a5c56e819cb11ebc203c1fc57b7a0a229a74b32`
 
 **Product Owner G0 authorization:** 2026-10-27
 
-**Closeout verification date:** 2026-10-28
+**Closeout verification date:** 2026-10-29
 
 **SOL reviewer:** SOL
 
 This record reconciles the integrated feature and newly executed closeout evidence. It does not authorize a feature-to-`main` merge. Task integration is complete; SOL closeout review and separate Product Owner exact-head merge authorization remain required.
+
+The authoritative final acceptance evidence package is [`F-02-final-acceptance-review.md`](F-02-final-acceptance-review.md). It distinguishes the newly executed 2026-10-29 closeout runs from the historical 2026-10-28 evidence retained below. Recommendation: **READY for SOL independent review**, not finally accepted.
 
 ## F02-SEC-001 activation-token remediation (2026-10-29)
 
