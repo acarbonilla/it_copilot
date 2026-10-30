@@ -185,3 +185,33 @@ class PrivateArtifactStore:
         self._assert_private_path(destination)
         os.replace(source, destination)
         return destination
+
+    def inventory_keys(self):
+        keys = []
+        for namespace in ("originals", "extracted"):
+            root = self.root / namespace
+            if not root.exists():
+                continue
+            if _is_reparse_point(root):
+                raise ArtifactStorageError("Artifact inventory contains a reparse point")
+            for path in root.rglob("*"):
+                if path.is_dir():
+                    if _is_reparse_point(path):
+                        raise ArtifactStorageError("Artifact inventory contains a reparse point")
+                    continue
+                key = path.relative_to(self.root).as_posix()
+                self.resolve(key)
+                keys.append(key)
+        return sorted(keys)
+
+    def restore_quarantined(self, quarantine_path, storage_key):
+        quarantine_root = (self.root / "quarantine").resolve(strict=True)
+        source = Path(quarantine_path).resolve(strict=True)
+        if not source.is_relative_to(quarantine_root) or _is_reparse_point(source):
+            raise ArtifactStorageError("Quarantine artifact is invalid")
+        destination = self.root / Path(*storage_key.split("/"))
+        self._assert_private_path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            raise ArtifactStorageError("Artifact restore target already exists")
+        os.replace(source, destination)

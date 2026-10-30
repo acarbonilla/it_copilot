@@ -1,6 +1,6 @@
 # F-03 — Documentation Management
 
-**Status:** Consolidated G1 ratified; Batches A-C accepted at SOL G2; Batch D submitted for SOL G2
+**Status:** Batches A-D accepted at SOL G2; Batch E implemented; final F-03 SOL G2 pending
 **Branch:** `feature/documentation-management`
 **Verified planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
 **Product Owner authorization:** Ratified IC-009 through IC-017 and bounded Batches A-E, subject to exact-head SOL G2 boundaries
@@ -47,10 +47,10 @@ Excluded until separately specified: F-04 Copilot/retrieval behavior, external A
 | IC-011 | Secure Upload and Private Artifact Storage | Consolidated G1 proposal | Batch B remediated; SOL G2 PASS |
 | IC-012 | Database-Backed Processing Job Lifecycle | Consolidated G1 proposal | Batch C implemented; SOL G2 PASS |
 | IC-013 | Document Processing Worker and Text Extraction | Consolidated G1 proposal | Batch C implemented; SOL G2 PASS |
-| IC-014 | Document Management API | Consolidated G1 proposal | Batch D implemented; SOL G2 pending |
-| IC-015 | Document Management User Interface | Consolidated G1 proposal | Batch D implemented; SOL G2 pending |
-| IC-016 | Reconciliation, Recovery, and Operator Controls | Consolidated G1 proposal | Batch E not started |
-| IC-017 | F-03 Integrated Security and Acceptance | Consolidated G1 proposal | Batch E not started |
+| IC-014 | Document Management API | Consolidated G1 proposal | Batch D implemented; SOL G2 PASS |
+| IC-015 | Document Management User Interface | Consolidated G1 proposal | Batch D implemented; SOL G2 PASS |
+| IC-016 | Reconciliation, Recovery, and Operator Controls | Consolidated G1 proposal | Batch E implemented; final SOL G2 pending |
+| IC-017 | F-03 Integrated Security and Acceptance | Consolidated G1 proposal | Batch E implemented; final SOL G2 pending |
 
 The Product Owner ratified the consolidated proposal. Implementation remains bounded by the batch-specific SOL G2 gates recorded below.
 
@@ -232,6 +232,22 @@ Living documents:
 
 - [IC-014 specification](../tasks/IC-014/specification.md), [implementation](../tasks/IC-014/implementation.md), [test results](../tasks/IC-014/test-results.md), and [review](../tasks/IC-014/review.md)
 - [IC-015 specification](../tasks/IC-015/specification.md), [implementation](../tasks/IC-015/implementation.md), [test results](../tasks/IC-015/test-results.md), and [review](../tasks/IC-015/review.md)
+
+SOL G2 approved Batch D at `6cd50f2a0ce041a2955e8e582bba44ce06ad6950` (review `5710006311`).
+
+## Batch E implementation inventory
+
+**Tasks:** IC-016 Reconciliation, Recovery, and Operator Controls; IC-017 Integrated Security and Acceptance
+**Baseline:** `6cd50f2a0ce041a2955e8e582bba44ce06ad6950`
+**Status:** Implemented and tested; stopped for final F-03 SOL G2 review
+
+Batch E adds dry-run-first bounded recovery inventory and execution, active App Admin actor validation, stale-job repair, invalid-artifact failure handling, compensated orphan quarantine, audit migration `0008`, multi-process private-root ACL verification, and final native-MySQL/frontend/real-Chrome acceptance evidence. No non-test recovery or purge was executed.
+
+Living documents and acceptance:
+
+- [IC-016 specification](../tasks/IC-016/specification.md), [implementation](../tasks/IC-016/implementation.md), [test results](../tasks/IC-016/test-results.md), and [review](../tasks/IC-016/review.md)
+- [IC-017 specification](../tasks/IC-017/specification.md), [implementation](../tasks/IC-017/implementation.md), [test results](../tasks/IC-017/test-results.md), and [review](../tasks/IC-017/review.md)
+- [F-03 final acceptance review](F-03-acceptance-review.md)
 
 ## Planning recommendation
 

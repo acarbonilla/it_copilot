@@ -77,10 +77,11 @@ COOKIE_SECURE = os.environ.get("DJANGO_COOKIE_SECURE", "false").lower() in {"1",
 SESSION_COOKIE_SECURE = COOKIE_SECURE
 CSRF_COOKIE_SECURE = COOKIE_SECURE
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")
+CORS_ALLOWED_ORIGINS = [FRONTEND_ORIGIN]
 CORS_ALLOW_CREDENTIALS = True
 CORS_URLS_REGEX = r"^/api/.*$"
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://localhost:8000"]
+CSRF_TRUSTED_ORIGINS = [FRONTEND_ORIGIN, "http://localhost:8000", "http://localhost:8100"]
 CSRF_FAILURE_VIEW = "config.errors.csrf_failure"
 
 REST_FRAMEWORK = {

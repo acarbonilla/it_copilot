@@ -22,6 +22,7 @@ ACTION_VALUES = (
     "document.deleted",
     "document.upload_created",
     "document.retry_requested",
+    "document.reconciled",
 )
 TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource")
 OUTCOME_VALUES = ("success", "denied", "failure")
@@ -48,6 +49,7 @@ class SecurityAuditEvent(models.Model):
         DOCUMENT_DELETED = "document.deleted", "Document deleted"
         DOCUMENT_UPLOAD_CREATED = "document.upload_created", "Document upload created"
         DOCUMENT_RETRY_REQUESTED = "document.retry_requested", "Document processing retry requested"
+        DOCUMENT_RECONCILED = "document.reconciled", "Document recovery reconciled"
 
     class TargetType(models.TextChoices):
         ACCOUNT = "account", "Account"

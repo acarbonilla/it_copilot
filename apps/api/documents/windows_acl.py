@@ -79,6 +79,10 @@ def enforce_and_verify_private_acl(root):
     if os.name != "nt":
         raise ImproperlyConfigured("Private document storage ACL enforcement requires Windows")
     sid = current_user_sid()
+    try:
+        return verify_private_acl(root, sid=sid)
+    except ImproperlyConfigured:
+        pass
     _powershell(_SET_ACL, root=root, sid=sid)
     return verify_private_acl(root, sid=sid)
 

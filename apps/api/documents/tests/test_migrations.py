@@ -14,6 +14,7 @@ class DocumentMigrationContractTests(SimpleTestCase):
         self.assertIn(("documents", "0003_originalartifact"), loader.disk_migrations)
         self.assertIn(("documents", "0004_processing_metadata"), loader.disk_migrations)
         self.assertIn(("security_audit", "0007_remove_securityauditevent_audit_action_known_and_more"), loader.disk_migrations)
+        self.assertIn(("security_audit", "0008_remove_securityauditevent_audit_action_known_and_more"), loader.disk_migrations)
         audit = loader.disk_migrations[("security_audit", "0005_remove_securityauditevent_audit_action_known_and_more")]
         self.assertIn(("security_audit", "0004_f02_sec_001_invitation_events"), audit.dependencies)
 
@@ -27,6 +28,7 @@ class DocumentMigrationContractTests(SimpleTestCase):
                 SecurityAuditEvent.Action.DOCUMENT_DELETED,
                 SecurityAuditEvent.Action.DOCUMENT_UPLOAD_CREATED,
                 SecurityAuditEvent.Action.DOCUMENT_RETRY_REQUESTED,
+                SecurityAuditEvent.Action.DOCUMENT_RECONCILED,
             },
             {
                 "document.created",
@@ -36,5 +38,6 @@ class DocumentMigrationContractTests(SimpleTestCase):
                 "document.deleted",
                 "document.upload_created",
                 "document.retry_requested",
+                "document.reconciled",
             },
         )

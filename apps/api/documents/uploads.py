@@ -124,6 +124,7 @@ def create_document_upload(*, actor, title, description, uploaded_file, store=No
     if not uploaded_file or getattr(uploaded_file, "size", 0) > settings.DOCUMENT_MAX_FILE_BYTES:
         raise InvalidUpload
     filename = _safe_display_filename(getattr(uploaded_file, "name", None))
+    owns_store = store is None
     store = store or PrivateArtifactStore()
     stored = None
     try:
@@ -187,3 +188,6 @@ def create_document_upload(*, actor, title, description, uploaded_file, store=No
         if stored is not None:
             _compensate(store, stored.storage_key)
         raise
+    finally:
+        if owns_store:
+            store.close()
