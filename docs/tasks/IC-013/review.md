@@ -5,6 +5,7 @@
 ## Objective review points
 
 - Confirm parsing is impossible before Windows Job Object assignment and that timeout, memory, subprocess, and lease-loss paths terminate the process tree.
+- Confirm one-shot processing does not report no work solely because the earliest eligible document is locked when another eligible document is available.
 - Confirm PDF/TXT/Markdown normalization, page metadata, strict UTF-8, and character ceiling.
 - Confirm source and staged artifact integrity checks and private opaque paths.
 - Confirm publication revalidates every document/version/job fence transactionally and cannot overwrite a valid prior result.

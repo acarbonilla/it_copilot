@@ -7,6 +7,7 @@
 ## Contract
 
 - `manage.py process_documents` is independently runnable with one-shot, bounded-count, and continuous polling modes. It exposes no inbound network endpoint.
+- A one-shot worker may claim the next deterministically ordered eligible job whose document row is unlocked; an earlier locked document does not incorrectly terminate the one-shot poll while other eligible work is available.
 - PDF uses strict pypdf extraction. TXT and Markdown use strict UTF-8 decoding; Markdown is inert text. Output normalizes CRLF/CR to LF and Unicode to NFC.
 - Output is nonempty normalized UTF-8, limited to 2,000,000 characters, and records byte length, character count, SHA-256, extractor version, and PDF page count.
 - Extraction cannot start until its child is assigned to the reviewed Windows Job Object. The job has kill-on-close, a 512 MiB aggregate memory ceiling, two-process ceiling, and a parent-enforced 120-second deadline.

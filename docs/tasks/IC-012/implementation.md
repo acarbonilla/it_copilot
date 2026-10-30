@@ -7,6 +7,7 @@
 - `documents.jobs` owns claim, heartbeat, retry/failure, cancellation, and fenced publication services.
 - `ProcessingJob` gains controlled failure code and completion timestamp fields. Forward migrations add these fields and lease/completion state constraints.
 - Claim candidates are ordered deterministically and revalidated after acquiring the document/version/job lock chain.
+- The SOL G2 follow-up keeps a transaction-local set of document IDs whose rows could not be acquired with `skip_locked=True`, then continues the same deterministic candidate ordering until it locks an eligible document or exhausts the queue. It never locks a version or job before its document.
 - Attempt identity is the tuple `(job UUID, worker UUID, attempt_count)`. Lease expiry or any tuple mismatch rejects heartbeat, failure, and publication.
 - Retry remains on the same unique job row, preserving the one-nonterminal-job constraint and preventing duplicate usable attempts.
 - Document archive/delete calls job cancellation inside the existing lifecycle/audit transaction.

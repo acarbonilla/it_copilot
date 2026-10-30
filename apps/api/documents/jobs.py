@@ -51,28 +51,33 @@ def claim_next_job(*, worker_id, now=None):
     now = now or timezone.now()
     while True:
         with transaction.atomic():
-            candidate = (
-                ProcessingJob.objects
-                .filter(
-                    Q(state__in=(ProcessingJob.State.PENDING, ProcessingJob.State.RETRY_WAIT), available_at__lte=now)
-                    | Q(state=ProcessingJob.State.RUNNING, lease_expires_at__lte=now),
-                    cancellation_requested=False,
-                    document_version__document__visibility=Document.Visibility.ACTIVE,
+            skipped_document_ids = set()
+            while True:
+                candidates = (
+                    ProcessingJob.objects
+                    .filter(
+                        Q(state__in=(ProcessingJob.State.PENDING, ProcessingJob.State.RETRY_WAIT), available_at__lte=now)
+                        | Q(state=ProcessingJob.State.RUNNING, lease_expires_at__lte=now),
+                        cancellation_requested=False,
+                        document_version__document__visibility=Document.Visibility.ACTIVE,
+                    )
+                    .filter(document_version__document__candidate_version_id=F("document_version_id"))
+                    .order_by("available_at", "created_at", "id")
+                    .values("id", "document_version_id", "document_version__document_id")
                 )
-                .filter(document_version__document__candidate_version_id=F("document_version_id"))
-                .order_by("available_at", "created_at", "id")
-                .values("id", "document_version_id", "document_version__document_id")
-                .first()
-            )
-            if candidate is None:
-                return None
-            document = (
-                Document.objects.select_for_update(skip_locked=True)
-                .filter(pk=candidate["document_version__document_id"])
-                .first()
-            )
-            if document is None:
-                return None
+                if skipped_document_ids:
+                    candidates = candidates.exclude(document_version__document_id__in=skipped_document_ids)
+                candidate = candidates.first()
+                if candidate is None:
+                    return None
+                document = (
+                    Document.objects.select_for_update(skip_locked=True)
+                    .filter(pk=candidate["document_version__document_id"])
+                    .first()
+                )
+                if document is not None:
+                    break
+                skipped_document_ids.add(candidate["document_version__document_id"])
             version = DocumentVersion.objects.select_for_update().get(pk=candidate["document_version_id"])
             job = ProcessingJob.objects.select_for_update().get(pk=candidate["id"])
             is_due = (

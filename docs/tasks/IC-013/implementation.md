@@ -7,6 +7,7 @@
 - `documents.extraction_worker` performs bounded parsing and writes an exclusive private UTF-8 result.
 - `documents.extraction_isolation` establishes Job Object containment before sending the parse handshake, refreshes the database lease during long work, terminates the entire job on deadline/lease loss, and accepts only bounded structured metadata.
 - `documents.processor` verifies original digest/length, invokes isolation, verifies staged output digest/length/character count, and calls the fenced publication service.
+- The SOL G2 claim follow-up allows the processor to reach the next eligible unlocked document when an earlier document is transactionally busy, without changing extraction, publication, or document/version/job lock ordering.
 - Successful publication creates exactly one `ExtractedTextArtifact`, marks the version ready, promotes the candidate to current, clears the candidate, and terminalizes the job in one transaction.
 - Missing/corrupt originals and invalid/unsupported content fail terminally. Timeout, resource exhaustion, parser infrastructure failure, and database interruption use bounded retries.
 - `process_documents` reports only `document_job outcome=<controlled> count=<integer>`.

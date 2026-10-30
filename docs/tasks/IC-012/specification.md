@@ -7,7 +7,7 @@
 ## Contract
 
 - States are `PENDING`, `RUNNING`, `SUCCEEDED`, `RETRY_WAIT`, `FAILED`, and `CANCELLED`. Database constraints bind terminal states to a null nonterminal slot and completion timestamp, and bind lease fields exclusively to `RUNNING`.
-- Claiming uses native MySQL transactions and row locks with deterministic `(available_at, created_at, id)` selection. The canonical lock order is document, version, job.
+- Claiming uses native MySQL transactions and row locks with deterministic `(available_at, created_at, id)` selection. If an earlier eligible job's document row is locked, the claimant skips that document and continues to the next ordered eligible job instead of reporting an empty queue. The canonical lock order is document, version, job.
 - Each claim increments the attempt number, records a UUID worker identity, and grants a 60-second lease. The worker refreshes the lease every 20 seconds while isolated parsing is active.
 - At most three attempts are allowed. Retry delays are five seconds after attempt one and 30 seconds after attempt two. Invalid/unsupported/corrupt content is terminal; bounded resource and infrastructure interruption may retry.
 - Completion and heartbeat require the exact job, worker UUID, attempt number, `RUNNING` state, and unexpired lease. A reclaimed attempt fences every earlier worker.

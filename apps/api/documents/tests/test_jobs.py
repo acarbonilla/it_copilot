@@ -4,7 +4,7 @@ from datetime import timedelta
 from unittest import skipUnless
 from unittest.mock import patch
 
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, transaction
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
@@ -136,6 +136,42 @@ class ProcessingJobLifecycleTests(TestCase):
 @skipUnless(connection.vendor == "mysql", "Native MySQL concurrency evidence")
 class ProcessingJobConcurrencyTests(TransactionTestCase):
     reset_sequences = True
+
+    def test_claim_skips_job_for_locked_document_and_claims_next_eligible_job(self):
+        first_document, _, first_job = create_pending_job()
+        _, _, second_job = create_pending_job()
+        now = timezone.now()
+        ProcessingJob.objects.filter(pk=first_job.pk).update(available_at=now - timedelta(seconds=2))
+        ProcessingJob.objects.filter(pk=second_job.pk).update(available_at=now - timedelta(seconds=1))
+        lock_acquired = threading.Event()
+        release_lock = threading.Event()
+
+        def lock_first_document():
+            close_old_connections()
+            try:
+                with transaction.atomic():
+                    Document.objects.select_for_update().get(pk=first_document.pk)
+                    lock_acquired.set()
+                    release_lock.wait(timeout=10)
+            finally:
+                close_old_connections()
+
+        lock_thread = threading.Thread(target=lock_first_document)
+        lock_thread.start()
+        self.assertTrue(lock_acquired.wait(timeout=10))
+        try:
+            claim = claim_next_job(worker_id=uuid.uuid4(), now=now)
+        finally:
+            release_lock.set()
+            lock_thread.join(timeout=20)
+
+        self.assertFalse(lock_thread.is_alive())
+        self.assertIsNotNone(claim)
+        self.assertEqual(claim.job_id, second_job.pk)
+        first_job.refresh_from_db()
+        second_job.refresh_from_db()
+        self.assertEqual(first_job.state, ProcessingJob.State.PENDING)
+        self.assertEqual(second_job.state, ProcessingJob.State.RUNNING)
 
     def test_competing_workers_claim_only_one_attempt(self):
         _, _, job = create_pending_job()

@@ -19,3 +19,15 @@
 | Dependency and Django checks | PASS - `pip check` and `manage.py check` |
 | Repository structure validation | PASS |
 | `git diff --check origin/main..HEAD` | PASS |
+
+## SOL G2 concurrency follow-up
+
+The native MySQL regression test first reproduced the defect against the Batch C exact head: with two eligible jobs and the earliest document locked by another transaction, `claim_next_job()` returned `None`. After the bounded candidate-scan correction, the locked job remains `PENDING` and the next deterministically ordered unlocked job becomes `RUNNING`.
+
+| Follow-up evidence | Result |
+| --- | --- |
+| Locked-earliest-document regression before correction | EXPECTED FAIL - claim was `None` |
+| Locked-earliest-document regression after correction | PASS - next unlocked job claimed; first remains pending |
+| `manage.py test documents.tests.test_jobs -v 1 --noinput` | PASS - 10/10 (2.394 seconds) |
+| `manage.py test documents -v 1 --noinput` | PASS - 72/72 (38.510 seconds) |
+| `manage.py test -v 1 --noinput` | PASS - 195/195 (211.162 seconds) |

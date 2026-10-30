@@ -5,6 +5,7 @@
 ## Objective review points
 
 - Confirm deterministic native MySQL claiming cannot grant the same attempt twice.
+- Confirm a lock on the earliest eligible document does not make the queue appear empty: the next ordered unlocked document is claimed while the locked job remains pending, with document/version/job lock order preserved.
 - Confirm document/version/job lock ordering and archive/publication race evidence.
 - Confirm worker UUID plus attempt number and lease expiry fence stale heartbeat, failure, and publication.
 - Confirm three-attempt maximum, retry delays, cancellation, terminal timestamps, and database constraints.
