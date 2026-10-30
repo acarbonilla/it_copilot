@@ -8,7 +8,7 @@ from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event, record_denied_event_best_effort
 from accounts.models import User
 
-from .models import Document
+from .models import Document, DocumentVersion, ProcessingJob
 from .policies import DocumentCapability, authorize_document
 
 
@@ -209,3 +209,31 @@ def delete_document(*, actor, document_id, expected_revision):
         to_state=Document.Visibility.DELETED,
         action=SecurityAuditEvent.Action.DOCUMENT_DELETED,
     )
+
+
+def retry_document_processing(*, actor, document_id, version_id, expected_revision):
+    try:
+        with transaction.atomic():
+            fresh_actor, document = _locked_authorized_document(
+                actor=actor, capability=DocumentCapability.PROCESS, document_id=document_id,
+            )
+            if document.metadata_revision != expected_revision or document.visibility != Document.Visibility.ACTIVE:
+                raise DocumentConflictError("Document state does not allow retry")
+            version = DocumentVersion.objects.select_for_update().filter(pk=version_id, document=document).first()
+            if version is None or version.processing_state not in {
+                DocumentVersion.ProcessingState.FAILED, DocumentVersion.ProcessingState.CANCELLED,
+            } or document.candidate_version_id != version.pk:
+                raise DocumentConflictError("Document version is not retryable")
+            if ProcessingJob.objects.select_for_update().filter(document_version=version, nonterminal_slot=True).exists():
+                raise DocumentConflictError("Document version already has active work")
+            job = ProcessingJob.objects.create(document_version=version, available_at=timezone.now())
+            version.processing_state = DocumentVersion.ProcessingState.QUEUED
+            version.save(update_fields=("processing_state", "updated_at"))
+            record_critical_event(
+                action=SecurityAuditEvent.Action.DOCUMENT_RETRY_REQUESTED, actor_user_id=fresh_actor.pk,
+                target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT, target_id=str(document.pk),
+                outcome=SecurityAuditEvent.Outcome.SUCCESS,
+            )
+            return job
+    except _DocumentUnavailable:
+        _raise_unavailable(actor)

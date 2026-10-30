@@ -84,6 +84,13 @@ class MigrationGuardrailTests(SimpleTestCase):
                 "api/v1/users/<int:user_id>/reactivate",
                 "api/v1/users/<int:user_id>/deletion-reviews",
                 "api/v1/documents",
+                "api/v1/documents/<uuid:document_id>",
+                "api/v1/documents/<uuid:document_id>/status",
+                "api/v1/documents/<uuid:document_id>/download",
+                "api/v1/documents/<uuid:document_id>/archive",
+                "api/v1/documents/<uuid:document_id>/restore",
+                "api/v1/documents/<uuid:document_id>/delete",
+                "api/v1/documents/<uuid:document_id>/retry",
             },
         )
 

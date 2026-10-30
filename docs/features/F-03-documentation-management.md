@@ -1,6 +1,6 @@
 # F-03 — Documentation Management
 
-**Status:** Consolidated G1 ratified; Batches A-B accepted at SOL G2; Batch C submitted for SOL G2
+**Status:** Consolidated G1 ratified; Batches A-C accepted at SOL G2; Batch D submitted for SOL G2
 **Branch:** `feature/documentation-management`
 **Verified planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
 **Product Owner authorization:** Ratified IC-009 through IC-017 and bounded Batches A-E, subject to exact-head SOL G2 boundaries
@@ -45,10 +45,10 @@ Excluded until separately specified: F-04 Copilot/retrieval behavior, external A
 | IC-009 | Document Domain and Lifecycle | Consolidated G1 proposal | Batch A implemented; SOL G2 PASS |
 | IC-010 | Document Authorization and Ownership | Consolidated G1 proposal | Batch A implemented; SOL G2 PASS |
 | IC-011 | Secure Upload and Private Artifact Storage | Consolidated G1 proposal | Batch B remediated; SOL G2 PASS |
-| IC-012 | Database-Backed Processing Job Lifecycle | Consolidated G1 proposal | Batch C implemented; SOL G2 pending |
-| IC-013 | Document Processing Worker and Text Extraction | Consolidated G1 proposal | Batch C implemented; SOL G2 pending |
-| IC-014 | Document Management API | Consolidated G1 proposal | Batch D not started |
-| IC-015 | Document Management User Interface | Consolidated G1 proposal | Batch D not started |
+| IC-012 | Database-Backed Processing Job Lifecycle | Consolidated G1 proposal | Batch C implemented; SOL G2 PASS |
+| IC-013 | Document Processing Worker and Text Extraction | Consolidated G1 proposal | Batch C implemented; SOL G2 PASS |
+| IC-014 | Document Management API | Consolidated G1 proposal | Batch D implemented; SOL G2 pending |
+| IC-015 | Document Management User Interface | Consolidated G1 proposal | Batch D implemented; SOL G2 pending |
 | IC-016 | Reconciliation, Recovery, and Operator Controls | Consolidated G1 proposal | Batch E not started |
 | IC-017 | F-03 Integrated Security and Acceptance | Consolidated G1 proposal | Batch E not started |
 
@@ -218,7 +218,20 @@ Living documents:
 - [IC-012 specification](../tasks/IC-012/specification.md), [implementation](../tasks/IC-012/implementation.md), [test results](../tasks/IC-012/test-results.md), and [review](../tasks/IC-012/review.md)
 - [IC-013 specification](../tasks/IC-013/specification.md), [implementation](../tasks/IC-013/implementation.md), [test results](../tasks/IC-013/test-results.md), and [review](../tasks/IC-013/review.md)
 
-Batch D remains blocked pending independent SOL G2 PASS on the exact Batch C review head.
+SOL G2 approved Batch C at `cac7285a1296de03b0f7967af2b6691b50744871` (review `5708367062`). Batch D is implemented and stops for independent SOL G2 review before Batch E.
+
+## Batch D implementation inventory
+
+**Tasks:** IC-014 Document Management API and IC-015 Document Management User Interface
+**Baseline:** `cac7285a1296de03b0f7967af2b6691b50744871`
+**Status:** Implemented and tested; submitted for SOL G2 exact-head review
+
+Batch D adds bounded owner-filtered document list/detail/status contracts, optimistic metadata and lifecycle actions, explicit audited retry, integrity-checked private attachment download, and the `/documents` management UI with upload, server-capability controls, five-second visible polling, and App Admin metadata-only presentation. It adds no recovery command, purge, extracted-text API, content search, preview, retrieval, or external-AI behavior.
+
+Living documents:
+
+- [IC-014 specification](../tasks/IC-014/specification.md), [implementation](../tasks/IC-014/implementation.md), [test results](../tasks/IC-014/test-results.md), and [review](../tasks/IC-014/review.md)
+- [IC-015 specification](../tasks/IC-015/specification.md), [implementation](../tasks/IC-015/implementation.md), [test results](../tasks/IC-015/test-results.md), and [review](../tasks/IC-015/review.md)
 
 ## Planning recommendation
 

@@ -47,6 +47,15 @@ async function unsafeRequest<T>(path: string, body?: object, method = "POST"): P
   }
 }
 
+async function unsafeFormRequest<T>(path: string, body: FormData): Promise<T> {
+  const send = (token: string) => request<T>(path, { method: "POST", headers: { "X-CSRFToken": token }, body });
+  try { return await send(csrfToken ?? await bootstrapCsrf()); }
+  catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 403 || error.code !== "csrf_failed") throw error;
+    return send(await bootstrapCsrf());
+  }
+}
+
 export async function login(email: string, password: string): Promise<UserIdentity> {
   const data = await unsafeRequest<{ user: UserIdentity }>("/api/v1/auth/login", { email, password });
   await bootstrapCsrf();
@@ -81,5 +90,14 @@ export async function requestDeletionReview(id: number, reason_code: "NO_LONGER_
 export async function inviteUser(email: string, it_role: UserIdentity["it_role"], is_app_admin: boolean): Promise<void> {
   await unsafeRequest("/api/v1/users/invitations", { email, it_role, is_app_admin });
 }
+
+export type DocumentItem = { id: string; title?: string; description?: string; owner_id?: number; visibility: "active" | "archived"; metadata_revision: number; created_at: string; updated_at: string; processing: null | { version_id: string; sequence: number; status: "staged" | "queued" | "processing" | "ready" | "failed" | "cancelled" }; capabilities: { edit: boolean; download: boolean; archive: boolean; restore: boolean; delete: boolean; retry: boolean } };
+export type DocumentPage = { documents: DocumentItem[]; pagination: { page: number; page_size: number; count: number; total_pages: number } };
+export async function listDocuments(page = 1, visibility = ""): Promise<DocumentPage> { return request<DocumentPage>(`/api/v1/documents?page=${page}${visibility ? `&visibility=${encodeURIComponent(visibility)}` : ""}`); }
+export async function uploadDocument(file: File, title: string, description: string): Promise<void> { const body = new FormData(); body.append("file", file); body.append("title", title); body.append("description", description); await unsafeFormRequest("/api/v1/documents", body); }
+export async function updateDocument(item: DocumentItem, title: string, description: string): Promise<DocumentItem> { return (await unsafeRequest<{ document: DocumentItem }>(`/api/v1/documents/${item.id}`, { title, description, expected_revision: item.metadata_revision }, "PATCH")).document; }
+export async function documentAction(item: DocumentItem, action: "archive" | "restore" | "delete"): Promise<DocumentItem> { return (await unsafeRequest<{ document: DocumentItem }>(`/api/v1/documents/${item.id}/${action}`, { expected_revision: item.metadata_revision })).document; }
+export async function retryDocument(item: DocumentItem): Promise<void> { if (!item.processing) throw new ApiError(409, "conflict", "Document has no retryable version"); await unsafeRequest(`/api/v1/documents/${item.id}/retry`, { expected_revision: item.metadata_revision, version_id: item.processing.version_id }); }
+export function documentDownloadUrl(id: string): string { return `${API_BASE_URL}/api/v1/documents/${id}/download`; }
 
 export function resetApiStateForTests() { csrfToken = null; }
