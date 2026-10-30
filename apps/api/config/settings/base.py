@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "accounts",
     "security_audit",
+    "documents",
     "health",
     "session_auth",
 ]
@@ -29,6 +30,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "documents.middleware.DocumentUploadSizeMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 ]
@@ -51,6 +53,20 @@ INVITATION_DELIVERY_MODE = os.environ.get("INVITATION_DELIVERY_MODE", "disabled"
 INVITATION_MAILBOX_ROOT = Path(os.environ.get("INVITATION_MAILBOX_ROOT", REPOSITORY_DIR / "tmp" / "invitations"))
 INVITATION_ACTIVATION_BASE_URL = os.environ.get("INVITATION_ACTIVATION_BASE_URL", "http://localhost:3000/activate")
 
+DOCUMENT_MAX_FILE_BYTES = 10 * 1024 * 1024
+DOCUMENT_MAX_REQUEST_BYTES = 12 * 1024 * 1024
+DOCUMENT_MAX_PDF_PAGES = 500
+DOCUMENT_PDF_PREFLIGHT_TIMEOUT_SECONDS = 120
+DOCUMENT_PDF_PREFLIGHT_MEMORY_BYTES = 512 * 1024 * 1024
+DOCUMENT_EXTRACTION_TIMEOUT_SECONDS = 120
+DOCUMENT_EXTRACTION_MEMORY_BYTES = 512 * 1024 * 1024
+DOCUMENT_EXTRACTION_MAX_CHARACTERS = 2_000_000
+DOCUMENT_JOB_LEASE_SECONDS = 60
+DOCUMENT_JOB_HEARTBEAT_SECONDS = 20
+DOCUMENT_PRIVATE_STORAGE_ROOT = Path(
+    os.environ.get("DOCUMENT_PRIVATE_STORAGE_ROOT", REPOSITORY_DIR / "tmp" / "documents-private")
+)
+
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
@@ -61,10 +77,11 @@ COOKIE_SECURE = os.environ.get("DJANGO_COOKIE_SECURE", "false").lower() in {"1",
 SESSION_COOKIE_SECURE = COOKIE_SECURE
 CSRF_COOKIE_SECURE = COOKIE_SECURE
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")
+CORS_ALLOWED_ORIGINS = [FRONTEND_ORIGIN]
 CORS_ALLOW_CREDENTIALS = True
 CORS_URLS_REGEX = r"^/api/.*$"
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://localhost:8000"]
+CSRF_TRUSTED_ORIGINS = [FRONTEND_ORIGIN, "http://localhost:8000", "http://localhost:8100"]
 CSRF_FAILURE_VIEW = "config.errors.csrf_failure"
 
 REST_FRAMEWORK = {

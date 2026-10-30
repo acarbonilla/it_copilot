@@ -17,7 +17,8 @@ describe("DashboardShell", () => {
     render(<DashboardShell />);
     expect(screen.getByRole("status")).toHaveTextContent("Loading");
     expect(await screen.findByText("member@example.com")).toBeVisible();
-    expect(screen.getAllByText("Not yet available")).toHaveLength(4);
+    expect(screen.getAllByText("Not yet available")).toHaveLength(3);
+    expect(screen.getByRole("link", { name: "Documents" })).toHaveAttribute("href", "/documents");
     expect(screen.queryByText("Administration")).not.toBeInTheDocument();
   });
 

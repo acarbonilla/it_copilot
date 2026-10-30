@@ -1,0 +1,254 @@
+# F-03 — Documentation Management
+
+**Status:** Batches A-D accepted at SOL G2; Batch E implemented; final F-03 SOL G2 pending
+**Branch:** `feature/documentation-management`
+**Verified planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
+**Product Owner authorization:** Ratified IC-009 through IC-017 and bounded Batches A-E, subject to exact-head SOL G2 boundaries
+**SOL planning review:** PASS, review `5693729644`
+
+The single ratifiable proposal is [F-03 Consolidated G1 Requirements Proposal](F-03-consolidated-g1-proposal.md). Every task definition and decision there is explicitly proposed rather than represented as an existing authoritative requirement.
+
+The Product Owner ratified the proposal at `5016a7b50edcfc8d67824e13bbb647a116fdbe79`, including Batches A-E subject to exact-head SOL G2 PASS at the four defined boundaries. SOL G1 review is `5693795827`. The finalized baseline separates document visibility from version processing, requires enforceable Windows parser process isolation/deadlines/resource limits, and protects extracted/staged text as document content. The exact finalization commit is recorded below after creation.
+
+**Finalized G1 specification commit:** `054bb5427b898a2e46eb085892d0b3f58a71b54c`
+
+## Scope and source status
+
+The repository assigns IC-009 through IC-017 to F-03 and identifies document management plus asynchronous document processing as planned MVP capabilities. It does not define the individual task titles, objectives, implementation scopes, acceptance criteria, verification requirements, or task dependencies for IC-009 through IC-017.
+
+Discovery checked:
+
+- `docs/product/mvp-requirements.md`, architecture overview/data model, task and feature registries, and TTDM-WA-001;
+- all repository Markdown references to IC-009–IC-017 and F-03;
+- GitHub issues and pull requests, open and closed, for each task code; and
+- remote branch names containing those task codes or documentation-management terms.
+
+No authoritative task definitions were found. This record therefore does not assign invented requirements to task codes. Product Owner-provided source definitions or explicit ratification of a proposed task breakdown is a hard prerequisite to implementation authorization.
+
+## Known feature boundary
+
+Authoritative repository statements establish only the following:
+
+- F-03 groups IC-009–IC-017 on `feature/documentation-management`.
+- The MVP plans document management and asynchronous document processing.
+- The worker is Django-managed, independently runnable, and uses a database-backed job queue.
+- The system direction is Next.js/TypeScript → Django/DRF → MySQL, with shared Django business logic used by the worker.
+- IC-003 role/ownership policy exists but explicitly requires later document service/query paths to enforce it.
+- Detailed behavior and acceptance criteria require later approved task specifications.
+
+Excluded until separately specified: F-04 Copilot/retrieval behavior, external AI services, F-05 credential vault data, IC-024 permanent account deletion, production deployment, external storage/queue activation, and destructive data migration.
+
+## Task inventory and requirements gap
+
+| Task | Ratified title | Ratified source | Current disposition |
+| --- | --- | --- | --- |
+| IC-009 | Document Domain and Lifecycle | Consolidated G1 proposal | Batch A implemented; SOL G2 PASS |
+| IC-010 | Document Authorization and Ownership | Consolidated G1 proposal | Batch A implemented; SOL G2 PASS |
+| IC-011 | Secure Upload and Private Artifact Storage | Consolidated G1 proposal | Batch B remediated; SOL G2 PASS |
+| IC-012 | Database-Backed Processing Job Lifecycle | Consolidated G1 proposal | Batch C implemented; SOL G2 PASS |
+| IC-013 | Document Processing Worker and Text Extraction | Consolidated G1 proposal | Batch C implemented; SOL G2 PASS |
+| IC-014 | Document Management API | Consolidated G1 proposal | Batch D implemented; SOL G2 PASS |
+| IC-015 | Document Management User Interface | Consolidated G1 proposal | Batch D implemented; SOL G2 PASS |
+| IC-016 | Reconciliation, Recovery, and Operator Controls | Consolidated G1 proposal | Batch E implemented; final SOL G2 pending |
+| IC-017 | F-03 Integrated Security and Acceptance | Consolidated G1 proposal | Batch E implemented; final SOL G2 pending |
+
+The Product Owner ratified the consolidated proposal. Implementation remains bounded by the batch-specific SOL G2 gates recorded below.
+
+## Dependency graph
+
+```text
+F-01 authentication/session/CSRF
+  ├─ authenticated document API and UI
+  └─ ownership and IT-role policy foundations
+
+F-02 identity/lifecycle/audit
+  ├─ active-account enforcement and App Admin separation
+  ├─ immutable actor attribution and authorization-denial audit
+  └─ deactivation/session behavior during document operations
+
+Ratified F-03 domain and authorization contract
+  ├─ persistence and migrations
+  ├─ upload/storage boundary
+  ├─ database-backed processing jobs → independently runnable worker
+  ├─ document management API → Next.js management UI
+  └─ recovery/integration evidence
+
+Future F-04 retrieval/Copilot may consume accepted processed-document outputs;
+F-03 must not implement F-04 behavior implicitly.
+```
+
+## Proposed implementation sequence — conditional, not task mapping
+
+The following workstreams are a review proposal only. They cannot be assigned to IC-009–IC-017 until the Product Owner ratifies the authoritative task breakdown.
+
+| Batch | Proposed workstream | Safe consolidation | Required SOL boundary |
+| --- | --- | --- | --- |
+| 0 | Requirements ratification | Resolve all task titles, lifecycle, permission, storage, and processing decisions together | Product Owner G0/G1 before code |
+| A | Domain, lifecycle, authorization, and audit contract | Schema plus service/query policy can be designed together because every later path depends on it | Review before migrations or endpoint implementation |
+| B | Upload and durable storage | Upload validation, artifact creation, metadata persistence, compensation, and download boundary belong in one atomicity review | Review file/path/content and rollback threats |
+| C | Database job queue and worker | Job state machine, claiming/lease protocol, retries, idempotency, parser limits, and failure recovery must ship as one concurrency boundary | Native MySQL concurrency/failure review |
+| D | Document CRUD/list API and management UI | Backend contracts and corresponding Next.js screens may be delivered together once A–C are stable | Authorization/CSRF/browser review |
+| E | Integrated recovery and closeout | Cross-service scenario, migrations, rollback, audit, performance limits, and recovery checkpoint | SOL integration review |
+
+Parallel development is safe only after Batch A freezes identifiers, lifecycle states, permission rules, and audit vocabulary. Upload/storage and UI scaffolding may then proceed in parallel with worker internals, but integration must wait for the durable job contract.
+
+## Proposed first implementation batch acceptance envelope
+
+This is a candidate G1 envelope for Product Owner resolution, not an approved IC task specification:
+
+1. Define the document aggregate, immutable identifiers, ownership/visibility fields, lifecycle states, timestamps, versioning/concurrency rule, and deletion semantics.
+2. Publish a deny-by-default permission matrix for App Admin, `IT_DOC_ADMIN`, `IT_EDITOR`, `IT_MEMBER`, owner, non-owner, inactive user, and anonymous user across list/read/create/update/upload/process/delete actions.
+3. Decide which operations produce critical atomic audit events and extend the controlled vocabulary through forward migrations without secret or document-content fields.
+4. Define MySQL constraints/indexes, forward-only migration dependencies, rollback/recovery expectations, and model-drift checks.
+5. Define bounded DRF request/response/error contracts without exposing storage paths, parser diagnostics, private document content, or unrestricted metadata.
+6. Require service/query-layer authorization tests, cross-owner negative tests, CSRF tests, audit-failure rollback tests, and native MySQL concurrency tests before later batches consume the domain.
+7. Update architecture/data-model documents only after the design is approved and implemented; planned components must not be described as operational.
+
+No code or migration should be created from this envelope until the missing task definitions and decisions below are approved.
+
+## Required design decisions
+
+Product Owner/SOL resolution is required for:
+
+1. Exact IC-009–IC-017 titles, objectives, acceptance criteria, and dependencies.
+2. Document ownership model: personal, shared, organization-wide, or a combination.
+3. Exact capability matrix for each IT role and App Admin; whether App Admin has document-content access.
+4. Document lifecycle and deletion/archive/restore semantics; retention and relationship to deferred IC-024.
+5. Accepted upload types, maximum request/file/page sizes, batch behavior, duplicate policy, and filename treatment.
+6. Durable binary storage for the local MVP: database, contained filesystem, or another explicitly approved adapter.
+7. Malware/scanning expectation, parser/library choices, archive handling, macro handling, and encrypted/password-protected files.
+8. Processing outputs: extracted text, metadata, chunks, status, diagnostics, and what future F-04 may consume.
+9. Job states, priority, attempts, leases/timeouts, retry/backoff, cancellation, poison-job handling, and operator recovery.
+10. Versioning and concurrent edit/upload behavior, including optimistic-lock or last-write policy.
+11. Search/list/filter/sort/pagination requirements and whether content search belongs to F-03 or F-04.
+12. Audit event vocabulary and whether filenames/titles are permitted audit data (default recommendation: no free text).
+13. Download/preview requirements and browser security headers.
+14. Local storage cleanup/reconciliation behavior after database, artifact, parser, or process failure.
+15. Performance/volume targets needed to bound synchronous API work and worker throughput tests.
+
+## Security and data-integrity boundaries
+
+| Boundary | Required control before implementation acceptance |
+| --- | --- |
+| Authorization | Server-side object/query filtering; deny by default; never trust frontend-hidden controls; inactive users denied on every request |
+| Upload | Bounded body/file count/size; extension plus content validation; filename neutralization; path containment; exclusive/non-overwriting creation; CSRF |
+| Content handling | Treat all uploaded content as hostile; no executable macros; parser time/memory/page limits; archive-bomb and recursive-container policy |
+| Storage | Opaque IDs; no user-controlled paths; least-privilege directory/account; private-by-default access; no path/secret leakage |
+| Processing queue | Transactional enqueue; atomic claim; lease/heartbeat decision; bounded retries; idempotent completion; stale-job recovery; no double publication |
+| Worker isolation | Independently runnable entrypoint; same authorization-independent service rules; no inbound public endpoint; sanitized logs/errors |
+| Database integrity | Forward migrations, FK/check/unique constraints, deterministic lock order, race tests, and audit/state atomicity |
+| Observability/audit | Controlled nonsecret identifiers only; no raw content, filename, storage path, exception, cookie, token, or unrestricted parser output |
+| Browser/download | Authorization on every fetch; safe content disposition/type; no inline execution of hostile formats; no secret browser storage |
+| Deletion/recovery | Explicit lifecycle; reference-aware cleanup; compensating artifact handling; reconciliation procedure; no IC-024 expansion |
+
+## Anticipated artifacts after requirements approval
+
+- Django domain app/models and forward migrations.
+- Controlled audit vocabulary migration if required.
+- DRF endpoints and API contract documentation.
+- Next.js document list/detail/upload/status screens.
+- Django management-command worker entrypoint and database-backed job services.
+- Native MySQL concurrency, migration, authorization, audit, rollback, idempotence, and artifact-failure suites.
+- Frontend unit, TypeScript, lint, build, and real-browser upload/processing scenarios.
+- Four living documents for each authorized task: `specification.md`, `implementation.md`, `test-results.md`, and `review.md`.
+
+## Recovery checkpoints
+
+| Purpose | Backup branch | Verified full SHA | Checks | Created | Cleanup approval |
+| --- | --- | --- | --- | --- | --- |
+| Planning baseline | Pending authorization | `b3adb37a6ac029053b4215ba08067de1427ab993` | Remote/local main equality | 2026-10-29 | Pending |
+| Before first schema integration | Pending | Pending | Native migrations, drift, focused/full regressions | Pending | Pending |
+| Before feature release | Pending | Pending | Full backend/frontend/browser/security evidence | Pending | Pending |
+
+## Express delivery governance
+
+- Consolidated implementation authorization may cover multiple ratified tasks/batches, but each task retains explicit acceptance criteria and four living documents.
+- SOL review occurs at the domain/authorization contract, upload/storage boundary, worker concurrency boundary, and final integration boundary rather than at arbitrary administrative intervals.
+- A batch must stop on schema/permission ambiguity, unsafe artifact handling, concurrency failure, model drift, or a missing external dependency.
+- Task PRs target this feature branch; no F-03 merge to `main` is authorized by planning approval.
+- The feature record will capture exact task heads, integration commits, test evidence, and recovery refs as implementation proceeds.
+
+## Batch A implementation inventory
+
+**Tasks:** IC-009 Document Domain and Lifecycle; IC-010 Document Authorization and Ownership
+**Status:** Implemented and tested; submitted for SOL G2 exact-head review
+**Implementation commit:** `494973c3ed493ce4b484dd819f41a3c9fa4f5277`
+**Exact review head:** The full SHA of the evidence commit containing this record is the Batch A SOL G2 review head and is reported in the handoff/PR.
+
+Batch A adds the `documents` Django domain app, native MySQL schema foundations, transactional lifecycle services, the shared document authorization policy, five controlled audit actions, and focused/full backend evidence. It does not add upload/storage I/O, worker execution, API routes, frontend screens, recovery commands, or F-04 behavior.
+
+SOL review `5694183813` required a Batch A correction at head `98cdb657bffc1807873be959b37223ba39fcec31`. The remediation unifies locked resolution of cross-owner/missing/deleted documents, reloads actor lifecycle/role state, removes probed identifiers from denial audits, and rejects cross-document current/candidate version references. Updated native MySQL focused and full-regression evidence is recorded in the IC-009 and IC-010 living documents. Batch B remains blocked pending SOL G2 PASS on the new exact head.
+
+**Batch A remediation implementation commit:** `bfcb5f7f9734a579d4089ec8142a835a990d30f4`
+
+Living documents:
+
+- [IC-009 specification](../tasks/IC-009/specification.md), [implementation](../tasks/IC-009/implementation.md), [test results](../tasks/IC-009/test-results.md), and [review](../tasks/IC-009/review.md)
+- [IC-010 specification](../tasks/IC-010/specification.md), [implementation](../tasks/IC-010/implementation.md), [test results](../tasks/IC-010/test-results.md), and [review](../tasks/IC-010/review.md)
+
+## Batch B implementation inventory
+
+**Task:** IC-011 Secure Upload and Private Artifact Storage
+**Baseline:** `fa76fe6044702447e38cb3aab38d0e4368ad5903`
+**SOL Batch A review:** PASS, review `5694518418`
+**Status:** Implemented and tested; submitted for SOL G2 exact-head review
+**Implementation commit:** `c368ca8ce392918f9d79287f54f45bad1918eba1`
+**Exact review head:** The full SHA of the final evidence commit is reported in the handoff/PR.
+
+Batch B adds bounded PDF/TXT/Markdown multipart creation, private opaque filesystem storage, original-artifact integrity metadata, initial queued version/job creation, guarded candidate assignment, critical upload audit, and filesystem/database compensation. It introduces no download/list/detail API, extraction worker, job claiming, frontend UI, reconciliation command, or F-04 behavior.
+
+Living documents: [IC-011 specification](../tasks/IC-011/specification.md), [implementation](../tasks/IC-011/implementation.md), [test results](../tasks/IC-011/test-results.md), and [review](../tasks/IC-011/review.md).
+
+SOL review `5695041394` required security remediation at `47e1a12b9000e6e3b7957446fc4ae9690598f4c3`. The replacement implementation isolates PDF preflight behind a handshake-controlled Windows Job Object, enforces and verifies a service/SYSTEM-only private-root ACL plus replacement lock, and rejects invalid request lengths before multipart parsing. Batch C remains blocked pending SOL G2 PASS on the new exact review head.
+
+**Batch B security remediation commit:** `16d3e1a3baf0c1af982cd672bd0d1ecd1c4e0e3a`
+
+## Batch C implementation inventory
+
+**Tasks:** IC-012 Database-Backed Processing Job Lifecycle and IC-013 Document Processing Worker and Text Extraction
+**Baseline:** `ea47fe4f0d6a4555cb9ac449654910afc61ae318`
+**SOL Batch B G2:** PASS, review `5695573969`
+**Status:** Implemented and tested; pending SOL G2 exact-head review
+**Implementation commit:** `6b2d3fd75f5e729c7d3b487c3b74d657fe1dd8b8`
+
+Batch C adds deterministic native-MySQL job claiming, 60-second leases and 20-second heartbeats, three bounded attempts with 5/30-second retry delays, cancellation and stale-worker fencing, a Django-managed worker, Windows Job Object-isolated PDF/TXT/Markdown extraction, private normalized text artifacts, and transactional candidate publication. It adds no document-content API/UI, download route, operator recovery command, retrieval/chunking/embedding behavior, ADR-001 change, or IC-024 change.
+
+Living documents:
+
+- [IC-012 specification](../tasks/IC-012/specification.md), [implementation](../tasks/IC-012/implementation.md), [test results](../tasks/IC-012/test-results.md), and [review](../tasks/IC-012/review.md)
+- [IC-013 specification](../tasks/IC-013/specification.md), [implementation](../tasks/IC-013/implementation.md), [test results](../tasks/IC-013/test-results.md), and [review](../tasks/IC-013/review.md)
+
+SOL G2 approved Batch C at `cac7285a1296de03b0f7967af2b6691b50744871` (review `5708367062`). Batch D is implemented and stops for independent SOL G2 review before Batch E.
+
+## Batch D implementation inventory
+
+**Tasks:** IC-014 Document Management API and IC-015 Document Management User Interface
+**Baseline:** `cac7285a1296de03b0f7967af2b6691b50744871`
+**Status:** Implemented and tested; submitted for SOL G2 exact-head review
+
+Batch D adds bounded owner-filtered document list/detail/status contracts, optimistic metadata and lifecycle actions, explicit audited retry, integrity-checked private attachment download, and the `/documents` management UI with upload, server-capability controls, five-second visible polling, and App Admin metadata-only presentation. It adds no recovery command, purge, extracted-text API, content search, preview, retrieval, or external-AI behavior.
+
+Living documents:
+
+- [IC-014 specification](../tasks/IC-014/specification.md), [implementation](../tasks/IC-014/implementation.md), [test results](../tasks/IC-014/test-results.md), and [review](../tasks/IC-014/review.md)
+- [IC-015 specification](../tasks/IC-015/specification.md), [implementation](../tasks/IC-015/implementation.md), [test results](../tasks/IC-015/test-results.md), and [review](../tasks/IC-015/review.md)
+
+SOL G2 approved Batch D at `6cd50f2a0ce041a2955e8e582bba44ce06ad6950` (review `5710006311`).
+
+## Batch E implementation inventory
+
+**Tasks:** IC-016 Reconciliation, Recovery, and Operator Controls; IC-017 Integrated Security and Acceptance
+**Baseline:** `6cd50f2a0ce041a2955e8e582bba44ce06ad6950`
+**Status:** Implemented and tested; stopped for final F-03 SOL G2 review
+
+Batch E adds dry-run-first bounded recovery inventory and execution, active App Admin actor validation, stale-job repair, invalid-artifact failure handling, compensated orphan quarantine, audit migration `0008`, multi-process private-root ACL verification, and final native-MySQL/frontend/real-Chrome acceptance evidence. No non-test recovery or purge was executed.
+
+Living documents and acceptance:
+
+- [IC-016 specification](../tasks/IC-016/specification.md), [implementation](../tasks/IC-016/implementation.md), [test results](../tasks/IC-016/test-results.md), and [review](../tasks/IC-016/review.md)
+- [IC-017 specification](../tasks/IC-017/specification.md), [implementation](../tasks/IC-017/implementation.md), [test results](../tasks/IC-017/test-results.md), and [review](../tasks/IC-017/review.md)
+- [F-03 final acceptance review](F-03-acceptance-review.md)
+
+## Planning recommendation
+
+**HOLD implementation; READY for consolidated SOL/Product Owner G1 review.** The repository did not contain authoritative task definitions. The linked package now proposes a complete mapping and decision sheet without presenting it as pre-existing authority. Ratification and consolidated implementation authorization remain required before code.
