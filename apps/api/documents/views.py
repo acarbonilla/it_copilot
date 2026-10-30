@@ -141,25 +141,61 @@ class DocumentStatusView(APIView):
         except DocumentUnavailableError: return _error("not_found", "Document not found", 404)
 
 
+class _StreamingPrivateArtifact:
+    def __init__(self, source, store):
+        self.source = source
+        self.store = store
+
+    def __getattr__(self, name):
+        return getattr(self.source, name)
+
+    def read(self, size=-1):
+        return self.source.read(size)
+
+    def close(self):
+        try:
+            if self.source is not None:
+                self.source.close()
+                self.source = None
+        finally:
+            if self.store is not None:
+                self.store.close()
+                self.store = None
+
+
 class DocumentDownloadView(APIView):
     permission_classes = []
     def get(self, request, document_id):
         user = _identity(request)
         if user is None: return _error("authentication_required", "Authentication required", 401)
+        store = None
+        source = None
         try:
             document = _get(user, document_id, DocumentCapability.DOWNLOAD)
             version = document.current_version or document.candidate_version
             if version is None or version.processing_state == DocumentVersion.ProcessingState.STAGED: raise DocumentUnavailableError
-            artifact, path = version.original_artifact, PrivateArtifactStore().resolve(version.original_artifact.storage_key)
+            artifact = version.original_artifact
+            store = PrivateArtifactStore()
+            path = store.resolve(artifact.storage_key)
             digest, size = hashlib.sha256(), 0
-            with path.open("rb") as source:
-                while chunk := source.read(65536): digest.update(chunk); size += len(chunk)
+            source = path.open("rb")
+            while chunk := source.read(65536): digest.update(chunk); size += len(chunk)
             if digest.hexdigest() != artifact.sha256_digest or size != artifact.byte_length: raise ArtifactStorageError
-            response = FileResponse(path.open("rb"), as_attachment=True, filename=artifact.original_filename,
+            source.seek(0)
+            streaming_artifact = _StreamingPrivateArtifact(source, store)
+            source = store = None
+            response = FileResponse(streaming_artifact, as_attachment=True, filename=artifact.original_filename,
                                     content_type=artifact.detected_media_type)
             response["X-Content-Type-Options"], response["Cache-Control"] = "nosniff", "private, no-store"
             return response
-        except (DocumentUnavailableError, ArtifactStorageError, AttributeError): return _error("not_found", "Document not found", 404)
+        except (DocumentUnavailableError, ArtifactStorageError, AttributeError):
+            if source is not None: source.close()
+            if store is not None: store.close()
+            return _error("not_found", "Document not found", 404)
+        except Exception:
+            if source is not None: source.close()
+            if store is not None: store.close()
+            raise
 
 
 class DocumentActionView(APIView):

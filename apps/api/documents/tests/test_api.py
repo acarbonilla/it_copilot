@@ -1,3 +1,4 @@
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +10,7 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from documents.models import Document, DocumentVersion, ProcessingJob
 from documents.storage import PrivateArtifactStore
+from documents.services import archive_document, delete_document
 from documents.uploads import create_document_upload
 
 
@@ -98,11 +100,49 @@ class DocumentApiTests(TestCase):
                 description="", uploaded_file=SimpleUploadedFile("safe.txt", b"safe text", content_type="text/plain"),
                 store=store)
             self.client.force_login(self.owner)
-            with patch("documents.views.PrivateArtifactStore", return_value=store):
-                response = self.client.get(f"/api/v1/documents/{uploaded.document.pk}/download")
+            store_patch = patch("documents.views.PrivateArtifactStore", return_value=store)
+            store_patch.start()
+            self.addCleanup(store_patch.stop)
+            response = self.client.get(f"/api/v1/documents/{uploaded.document.pk}/download")
             self.assertEqual(response.status_code, 200)
             self.assertIn("attachment", response["Content-Disposition"])
             self.assertEqual(response["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response["Cache-Control"], "private, no-store")
+            artifact_path = store.resolve(uploaded.version.original_artifact.storage_key)
+            replacement = artifact_path.with_suffix(".replacement")
+            replacement.write_bytes(b"unverified replacement")
+            replacement_succeeded = False
+            try:
+                os.replace(replacement, artifact_path)
+                replacement_succeeded = True
+            except PermissionError:
+                replacement.unlink(missing_ok=True)
+            archive_document(actor=self.owner, document_id=uploaded.document.pk, expected_revision=1)
+            delete_document(actor=self.owner, document_id=uploaded.document.pk, expected_revision=2)
             self.assertEqual(b"".join(response.streaming_content), b"safe text")
-            store.close()
+            self.assertIsNone(store._root_lock)
+            if replacement_succeeded:
+                self.assertEqual(artifact_path.read_bytes(), b"unverified replacement")
+            uploaded.document.refresh_from_db()
+            self.assertEqual(uploaded.document.visibility, Document.Visibility.DELETED)
+
+    def test_deleted_document_download_is_denied_before_storage_is_opened(self):
+        self.client.force_login(self.owner)
+        delete_document(actor=self.owner, document_id=self.document.pk, expected_revision=1)
+        with patch("documents.views.PrivateArtifactStore") as store_class:
+            response = self.client.get(f"/api/v1/documents/{self.document.pk}/download")
+        self.assertEqual(response.status_code, 404)
+        store_class.assert_not_called()
+
+    def test_download_integrity_error_closes_file_and_store_resources(self):
+        with tempfile.TemporaryDirectory() as root, override_settings(DOCUMENT_PRIVATE_STORAGE_ROOT=Path(root) / "private"):
+            store = PrivateArtifactStore()
+            uploaded = create_document_upload(actor=self.owner, title="Download", description="",
+                uploaded_file=SimpleUploadedFile("safe.txt", b"safe text", content_type="text/plain"), store=store)
+            uploaded.version.original_artifact.sha256_digest = "0" * 64
+            uploaded.version.original_artifact.save(update_fields=("sha256_digest",))
+            self.client.force_login(self.owner)
+            with patch("documents.views.PrivateArtifactStore", return_value=store):
+                response = self.client.get(f"/api/v1/documents/{uploaded.document.pk}/download")
+            self.assertEqual(response.status_code, 404)
+            self.assertIsNone(store._root_lock)

@@ -9,6 +9,7 @@
 - Confirm every unsafe method is CSRF protected and lifecycle/metadata mutations use expected revisions.
 - Confirm retry cannot duplicate usable work and its critical audit failure rolls back job/version changes.
 - Confirm attachment downloads reauthorize, integrity-check, sanitize disposition, disable sniffing/caching, and never disclose storage keys.
+- Confirm verification and streaming use the same handle, pathname replacement cannot substitute bytes, and file/store resources close on normal completion, disconnect, and verification errors while private-root protections remain held.
 
 ## Residual boundary
 

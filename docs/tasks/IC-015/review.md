@@ -9,6 +9,7 @@
 - Confirm upload bounds, status announcements, keyboard labels, destructive confirmation, conflict messaging, pagination, and responsive layout.
 - Confirm polling is visibility-gated, no faster than five seconds, terminally bounded, and mutation-free.
 - Confirm no document content, filename, storage path/key, lease, token, or unrestricted exception enters browser storage, URLs, analytics, or console output.
+- Confirm download remains a direct attachment navigation and does not weaken the server's same-handle verification or resource-lifetime guarantees.
 
 ## Residual boundary
 
