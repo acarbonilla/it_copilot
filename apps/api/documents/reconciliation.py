@@ -13,6 +13,8 @@ from security_audit.services import record_critical_event
 
 from .jobs import _terminalize
 from .models import Document, DocumentVersion, ExtractedTextArtifact, OriginalArtifact, ProcessingJob
+from .models import QuarantinedArtifact
+from .artifact_coordination import lock_artifact_publication
 from .storage import ArtifactStorageError, PrivateArtifactStore
 
 
@@ -76,16 +78,23 @@ def execute_recovery_issue(*, actor, issue, store=None, now=None):
     validate_recovery_actor(actor); now = now or timezone.now(); store = store or PrivateArtifactStore()
     try:
         if issue.kind == "orphan_artifact":
-            quarantined = store.quarantine(issue.identifier)
-            try:
-                with transaction.atomic():
-                    _lock_guard(); fresh = User.objects.select_for_update().get(pk=actor.pk); validate_recovery_actor(fresh)
+            with transaction.atomic():
+                lock_artifact_publication()
+                _lock_guard(); fresh = User.objects.select_for_update().get(pk=actor.pk); validate_recovery_actor(fresh)
+                if (OriginalArtifact.objects.filter(storage_key=issue.identifier).exists()
+                        or ExtractedTextArtifact.objects.filter(storage_key=issue.identifier).exists()):
+                    return "referenced"
+                if QuarantinedArtifact.objects.filter(storage_key=issue.identifier).exists():
+                    return "already_reconciled"
+                quarantined = store.quarantine(issue.identifier)
+                try:
+                    QuarantinedArtifact.objects.create(storage_key=issue.identifier)
                     opaque_id = str(uuid.uuid5(uuid.NAMESPACE_URL, issue.identifier))
                     _audit(fresh, SecurityAuditEvent.TargetType.PRIVATE_RESOURCE, opaque_id)
-            except Exception:
-                store.restore_quarantined(quarantined, issue.identifier)
-                raise
-            return "quarantined"
+                except Exception:
+                    store.restore_quarantined(quarantined, issue.identifier)
+                    raise
+                return "quarantined"
         if issue.kind == "purge_eligible":
             return "reported_only"
         with transaction.atomic():

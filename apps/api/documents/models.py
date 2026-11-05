@@ -197,3 +197,16 @@ class ExtractedTextArtifact(models.Model):
             models.CheckConstraint(condition=models.Q(byte_length__gt=0), name="extracted_text_bytes_positive"),
             models.CheckConstraint(condition=models.Q(character_count__lte=2_000_000), name="extracted_text_character_limit"),
         ]
+
+
+class ArtifactPublicationGuard(models.Model):
+    """Singleton row serializing artifact publication and orphan quarantine."""
+
+    singleton = models.BooleanField(default=True, unique=True, editable=False)
+
+
+class QuarantinedArtifact(models.Model):
+    """Durable tombstone preventing publication after quarantine wins the race."""
+
+    storage_key = models.CharField(max_length=255, primary_key=True, editable=False)
+    quarantined_at = models.DateTimeField(auto_now_add=True, editable=False)

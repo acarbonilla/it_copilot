@@ -11,6 +11,7 @@ from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event, record_denied_event_best_effort
 
 from .models import Document, DocumentVersion, OriginalArtifact, ProcessingJob
+from .artifact_coordination import lock_artifact_publication, reject_quarantined_key
 from .pdf_isolation import PdfIsolationFailure, PdfPreflightRejected, run_isolated_pdf_preflight
 from .policies import DocumentCapability, authorize_document
 from .storage import ArtifactStorageError, ArtifactTooLarge, PrivateArtifactStore
@@ -144,6 +145,9 @@ def create_document_upload(*, actor, title, description, uploaded_file, store=No
             raise
 
         with transaction.atomic():
+            lock_artifact_publication()
+            reject_quarantined_key(stored.storage_key)
+            store.resolve(stored.storage_key)
             actor = _fresh_upload_actor(actor)
             document = Document(
                 owner=actor,

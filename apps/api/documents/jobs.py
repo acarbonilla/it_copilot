@@ -8,6 +8,11 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from .models import Document, DocumentVersion, ExtractedTextArtifact, ProcessingJob
+from .artifact_coordination import (
+    ArtifactPublicationRejected,
+    lock_artifact_publication,
+    reject_quarantined_key,
+)
 
 
 RETRY_DELAYS_SECONDS = (5, 30)
@@ -18,7 +23,7 @@ class LeaseLost(Exception):
     pass
 
 
-class PublicationRejected(LeaseLost):
+class PublicationRejected(LeaseLost, ArtifactPublicationRejected):
     pass
 
 
@@ -178,9 +183,15 @@ def fail_claim(claim, *, error_code, retryable, now=None):
         return job.state
 
 
-def publish_claim(claim, *, stored, character_count, page_count, extractor_version, now=None):
+def publish_claim(claim, *, stored, character_count, page_count, extractor_version, store, now=None):
     now = now or timezone.now()
     with transaction.atomic():
+        lock_artifact_publication()
+        try:
+            reject_quarantined_key(stored.storage_key)
+        except ArtifactPublicationRejected as exc:
+            raise PublicationRejected(str(exc)) from exc
+        store.resolve(stored.storage_key)
         job, version, document = _locked_claim(claim, now)
         if (
             job.cancellation_requested

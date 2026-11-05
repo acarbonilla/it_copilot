@@ -10,9 +10,20 @@ from django.utils import timezone
 
 from accounts.models import User
 from documents.jobs import JobClaim, LeaseLost, claim_next_job, fail_claim, heartbeat, publish_claim
-from documents.models import Document, DocumentVersion, ExtractedTextArtifact, ProcessingJob
-from documents.storage import StoredArtifact
+from documents.models import (
+    ArtifactPublicationGuard, Document, DocumentVersion, ExtractedTextArtifact,
+    ProcessingJob, QuarantinedArtifact,
+)
+from documents.storage import ArtifactStorageError, StoredArtifact
 from documents.services import archive_document
+
+
+class _AvailableStore:
+    def resolve(self, storage_key):
+        return storage_key
+
+
+AVAILABLE_STORE = _AvailableStore()
 
 
 def create_pending_job():
@@ -76,7 +87,7 @@ class ProcessingJobLifecycleTests(TestCase):
         stored = StoredArtifact("extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt", "a" * 64, 4)
         with patch.object(ExtractedTextArtifact.objects, "create", side_effect=RuntimeError("database failure")):
             with self.assertRaises(RuntimeError):
-                publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test")
+                publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test", store=AVAILABLE_STORE)
         job.refresh_from_db()
         document.refresh_from_db()
         version.refresh_from_db()
@@ -84,7 +95,7 @@ class ProcessingJobLifecycleTests(TestCase):
         self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
         self.assertIsNone(document.current_version_id)
 
-        artifact = publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test")
+        artifact = publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test", store=AVAILABLE_STORE)
         document.refresh_from_db()
         job.refresh_from_db()
         self.assertEqual(artifact.document_version_id, version.pk)
@@ -92,7 +103,37 @@ class ProcessingJobLifecycleTests(TestCase):
         self.assertIsNone(document.candidate_version_id)
         self.assertEqual(job.state, ProcessingJob.State.SUCCEEDED)
         with self.assertRaises(LeaseLost):
-            publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test")
+            publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test", store=AVAILABLE_STORE)
+
+    def test_quarantine_tombstone_rejects_publication_without_mutation(self):
+        document, version, job = create_pending_job()
+        claim = claim_next_job(worker_id=uuid.uuid4())
+        stored = StoredArtifact("extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt", "a" * 64, 4)
+        QuarantinedArtifact.objects.create(storage_key=stored.storage_key)
+        with self.assertRaises(LeaseLost):
+            publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test", store=AVAILABLE_STORE)
+        job.refresh_from_db(); version.refresh_from_db(); document.refresh_from_db()
+        self.assertEqual(job.state, ProcessingJob.State.RUNNING)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
+        self.assertIsNone(document.current_version_id)
+        self.assertFalse(ExtractedTextArtifact.objects.filter(storage_key=stored.storage_key).exists())
+
+    def test_missing_physical_artifact_rejects_publication_without_mutation(self):
+        document, version, job = create_pending_job()
+        claim = claim_next_job(worker_id=uuid.uuid4())
+        stored = StoredArtifact("extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt", "a" * 64, 4)
+        unavailable_store = _AvailableStore()
+        with patch.object(unavailable_store, "resolve", side_effect=ArtifactStorageError("missing")):
+            with self.assertRaises(ArtifactStorageError):
+                publish_claim(
+                    claim, stored=stored, character_count=4, page_count=None,
+                    extractor_version="test", store=unavailable_store,
+                )
+        job.refresh_from_db(); version.refresh_from_db(); document.refresh_from_db()
+        self.assertEqual(job.state, ProcessingJob.State.RUNNING)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
+        self.assertIsNone(document.current_version_id)
+        self.assertFalse(ExtractedTextArtifact.objects.filter(storage_key=stored.storage_key).exists())
 
     def test_cancelled_or_archived_document_cannot_be_claimed(self):
         document, version, job = create_pending_job()
@@ -136,6 +177,9 @@ class ProcessingJobLifecycleTests(TestCase):
 @skipUnless(connection.vendor == "mysql", "Native MySQL concurrency evidence")
 class ProcessingJobConcurrencyTests(TransactionTestCase):
     reset_sequences = True
+
+    def setUp(self):
+        ArtifactPublicationGuard.objects.get_or_create(pk=1)
 
     def test_claim_skips_job_for_locked_document_and_claims_next_eligible_job(self):
         first_document, _, first_job = create_pending_job()
@@ -213,7 +257,7 @@ class ProcessingJobConcurrencyTests(TransactionTestCase):
             )
             try:
                 barrier.wait(timeout=10)
-                publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test")
+                publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test", store=AVAILABLE_STORE)
                 outcomes.append("success")
             except LeaseLost:
                 outcomes.append("stale")
@@ -242,7 +286,7 @@ class ProcessingJobConcurrencyTests(TransactionTestCase):
             stored = StoredArtifact(f"extracted/{version.pk.hex}/{uuid.uuid4().hex}.txt", "b" * 64, 4)
             try:
                 barrier.wait(timeout=10)
-                publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test")
+                publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test", store=AVAILABLE_STORE)
                 outcomes.append("published")
             except LeaseLost:
                 outcomes.append("fenced")

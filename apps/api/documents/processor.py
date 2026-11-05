@@ -65,6 +65,7 @@ def process_one(*, worker_id=None, store=None, extraction_runner=run_isolated_ex
                 character_count=characters,
                 page_count=result.page_count,
                 extractor_version=result.extractor_version,
+                store=store,
             )
             storage_key = None
             return "succeeded"

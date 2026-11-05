@@ -1,6 +1,10 @@
 # F-03 Final Acceptance Review
 
-**Status:** Submitted for final SOL G2; PO acceptance pending
+**Status:** G2 HOLD — IC-026 implemented locally; native MySQL concurrency suite passed 7 tests; IC-026 SOL G2 review and PO acceptance pending; PR #22 is not authorized for merge
+
+## IC-026 orphan quarantine remediation
+
+The prior recovery acceptance entry did not cover the inventory-to-quarantine publication race. IC-026 adds shared database serialization, execution-time reference validation, quarantine tombstones, fail-closed audit recovery, and controlled concurrency regressions. Its original native MySQL concurrency suite passed 7 tests; IC-026-R01 adds separate lock-failure, real-upload race, and restore-failure evidence. The remediation is not accepted until SOL/PO review the exact commit. Other outstanding F-03 findings remain unaffected.
 
 F-03 now provides owner-isolated document lifecycle, `IT_DOC_ADMIN` cross-owner management, App Admin metadata-only separation, validated private upload/storage, deterministic processing with Windows isolation, secure same-handle downloads, the management UI, and dry-run-first recovery controls.
 

@@ -1,5 +1,7 @@
 # IC-016 Implementation Record
 
+> IC-026 follow-up: orphan quarantine now requires execution-time dual-table reference validation under the shared artifact-publication lock. See `docs/tasks/IC-026/` for the G2 HOLD remediation and evidence status.
+
 - `documents.reconciliation` provides bounded inventory, actor validation, per-issue revalidation, stale-job recovery, invalid-artifact failure, and compensated orphan quarantine.
 - `reconcile_documents` requires an actor and limit, prints controlled issue kinds/IDs, defaults to no mutation, and requires `--execute`.
 - `PrivateArtifactStore.inventory_keys()` enumerates only allowlisted opaque original/extracted keys and fails closed on reparse points. `restore_quarantined()` compensates audit failure without accepting user paths.
