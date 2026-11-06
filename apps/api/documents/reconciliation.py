@@ -9,7 +9,7 @@ from accounts.models import User
 from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event
 
-from .jobs import _terminalize
+from .jobs import _audit_processing_failure, _terminalize
 from .models import Document, DocumentVersion, ExtractedTextArtifact, OriginalArtifact, ProcessingJob
 from .models import QuarantinedArtifact
 from .artifact_coordination import lock_artifact_publication
@@ -100,8 +100,13 @@ def execute_recovery_issue(*, actor, issue, store=None, now=None):
             if artifacts and all(_artifact_valid(store, artifact) for artifact in artifacts): return "already_reconciled"
             for job in ProcessingJob.objects.select_for_update().filter(document_version=version, nonterminal_slot=True):
                 _terminalize(job, ProcessingJob.State.FAILED, now, "artifact_invalid")
+                _audit_processing_failure(document)
             version.processing_state = DocumentVersion.ProcessingState.FAILED
-            version.save(update_fields=("processing_state", "updated_at")); _audit(fresh, SecurityAuditEvent.TargetType.IT_DOCUMENT, str(document.pk))
+            version.save(update_fields=("processing_state", "updated_at"))
+            if document.current_version_id == version.pk:
+                document.current_version = None
+                document.save(update_fields=("current_version", "updated_at"))
+            _audit(fresh, SecurityAuditEvent.TargetType.IT_DOCUMENT, str(document.pk))
             return "reconciled"
     finally:
         store.close()

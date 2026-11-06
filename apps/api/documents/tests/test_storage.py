@@ -46,6 +46,30 @@ class PrivateArtifactStoreTests(SimpleTestCase):
             store.write_upload(upload)
         self.assertEqual([path for path in self.root.rglob("*") if path.is_file()], [])
 
+    def test_streaming_integrity_validation_rejects_size_and_digest_mismatch(self):
+        store = self.private_store()
+        stored = store.write_upload(SimpleUploadedFile("source.txt", b"private", content_type="text/plain"))
+        self.assertEqual(
+            store.validate_integrity(
+                stored.storage_key,
+                expected_byte_length=stored.byte_length,
+                expected_sha256_digest=stored.sha256_digest,
+            ),
+            store.resolve(stored.storage_key),
+        )
+        with self.assertRaises(ArtifactStorageError):
+            store.validate_integrity(
+                stored.storage_key,
+                expected_byte_length=stored.byte_length + 1,
+                expected_sha256_digest=stored.sha256_digest,
+            )
+        with self.assertRaises(ArtifactStorageError):
+            store.validate_integrity(
+                stored.storage_key,
+                expected_byte_length=stored.byte_length,
+                expected_sha256_digest="0" * 64,
+            )
+
     @override_settings(DOCUMENT_MAX_FILE_BYTES=4)
     def test_partial_write_cleanup_failure_moves_artifact_to_private_quarantine(self):
         store = self.private_store()

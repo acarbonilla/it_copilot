@@ -14,11 +14,12 @@ from unittest import skipUnless
 from django.utils import timezone
 
 from accounts.models import User
-from documents.jobs import claim_next_job, publish_claim
+from documents.jobs import LeaseLost, claim_next_job, publish_claim
 from documents.models import (
     Document, DocumentVersion, ExtractedTextArtifact, OriginalArtifact, ProcessingJob,
     ArtifactPublicationGuard, QuarantinedArtifact,
 )
+from documents.processor import _compensate_extracted
 from documents.reconciliation import RecoveryIssue, execute_recovery_issue
 from documents.storage import ArtifactStorageError, PrivateArtifactStore
 from documents.tests.test_jobs import create_pending_job
@@ -124,6 +125,10 @@ class DocumentReconciliationTests(TestCase):
 
     def test_audit_and_restore_failure_remains_failed_closed_for_late_publication(self):
         _, version, _ = create_pending_job()
+        original = OriginalArtifact.objects.get(document_version=version)
+        original_path = self.store.root / original.storage_key
+        original_path.parent.mkdir(parents=True, exist_ok=True)
+        original_path.write_bytes(b"original")
         claim = claim_next_job(worker_id=uuid.uuid4())
         key, path = self.store.allocate_extracted_path(version.pk)
         path.write_text("result awaiting publication", encoding="utf-8")
@@ -140,7 +145,7 @@ class DocumentReconciliationTests(TestCase):
         self.assertFalse(SecurityAuditEvent.objects.filter(
             action=SecurityAuditEvent.Action.DOCUMENT_RECONCILED,
         ).exists())
-        with self.assertRaises(ArtifactStorageError):
+        with self.assertRaises(LeaseLost):
             publish_claim(
                 claim, stored=stored, character_count=characters, page_count=None,
                 extractor_version="test", store=self.store,
@@ -181,6 +186,33 @@ class DocumentReconciliationTests(TestCase):
         self.assertEqual(execute_recovery_issue(actor=self.actor, issue=issue, store=self.store), "reconciled")
         version.refresh_from_db(); self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.FAILED)
 
+    def test_invalid_current_version_is_cleared_and_audit_failure_rolls_back(self):
+        owner = User.objects.create_user("current-owner@example.test", None, it_role=User.ITRole.IT_MEMBER)
+        document = Document.objects.create(owner=owner, title="Invalid current")
+        version = DocumentVersion.objects.create(
+            document=document, sequence=1, processing_state=DocumentVersion.ProcessingState.READY,
+            created_by_user_id=owner.pk,
+        )
+        document.current_version = version
+        document.save(update_fields=("current_version", "updated_at"))
+        OriginalArtifact.objects.create(
+            document_version=version,
+            storage_key="originals/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin",
+            sha256_digest="a" * 64, byte_length=10,
+            detected_media_type="text/plain", original_filename="missing.txt",
+        )
+        issue = RecoveryIssue("invalid_artifact", str(version.pk))
+        with patch("documents.reconciliation.record_critical_event", side_effect=RuntimeError("audit unavailable")):
+            with self.assertRaises(RuntimeError):
+                execute_recovery_issue(actor=self.actor, issue=issue, store=self.store)
+        document.refresh_from_db(); version.refresh_from_db()
+        self.assertEqual(document.current_version_id, version.pk)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.READY)
+        self.assertEqual(execute_recovery_issue(actor=self.actor, issue=issue, store=self.store), "reconciled")
+        document.refresh_from_db(); version.refresh_from_db()
+        self.assertIsNone(document.current_version_id)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.FAILED)
+
 
 @skipUnless(connection.vendor == "mysql", "Native MySQL quarantine concurrency evidence")
 class ArtifactQuarantineConcurrencyTests(TransactionTestCase):
@@ -201,6 +233,10 @@ class ArtifactQuarantineConcurrencyTests(TransactionTestCase):
 
     def _ready_claim_and_file(self):
         document, version, _ = create_pending_job()
+        original = OriginalArtifact.objects.get(document_version=version)
+        original_path = self.store.root / original.storage_key
+        original_path.parent.mkdir(parents=True, exist_ok=True)
+        original_path.write_bytes(b"original")
         claim = claim_next_job(worker_id=uuid.uuid4())
         key, path = self.store.allocate_extracted_path(version.pk)
         path.write_text("controlled concurrent result", encoding="utf-8")
@@ -294,6 +330,178 @@ class ArtifactQuarantineConcurrencyTests(TransactionTestCase):
         self.assertCountEqual(outcomes, ["quarantined", "rejected"])
         self.assertFalse(ExtractedTextArtifact.objects.filter(document_version=version).exists())
         self.assertTrue(QuarantinedArtifact.objects.filter(storage_key=stored.storage_key).exists())
+
+    def test_publication_wins_against_invalid_artifact_reconciliation(self):
+        from documents.jobs import publish_claim
+        from documents.jobs import record_critical_event as real_processing_audit
+
+        document, version, claim, stored, characters = self._ready_claim_and_file()
+        publication_holds_rows = threading.Event()
+        release_publication = threading.Event()
+        reconciliation_started = threading.Event()
+        reconciliation_done = threading.Event()
+        outcomes = []
+        errors = []
+
+        def hold_success_audit(*args, **kwargs):
+            publication_holds_rows.set()
+            if not release_publication.wait(timeout=10):
+                raise AssertionError("Publication release was not signalled")
+            return real_processing_audit(*args, **kwargs)
+
+        def publisher():
+            close_old_connections()
+            try:
+                publish_claim(
+                    claim, stored=stored, character_count=characters, page_count=None,
+                    extractor_version="test", store=self.store,
+                )
+                outcomes.append("published")
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                close_old_connections()
+
+        def reconciler():
+            close_old_connections()
+            try:
+                reconciliation_started.set()
+                actor = User.objects.get(pk=self.actor.pk)
+                result = execute_recovery_issue(
+                    actor=actor,
+                    issue=RecoveryIssue("invalid_artifact", str(version.pk)),
+                    store=PrivateArtifactStore(),
+                )
+                outcomes.append(result)
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                reconciliation_done.set()
+                close_old_connections()
+
+        with patch("documents.jobs.record_critical_event", side_effect=hold_success_audit):
+            first = threading.Thread(target=publisher)
+            second = threading.Thread(target=reconciler)
+            first.start()
+            self.assertTrue(publication_holds_rows.wait(timeout=10))
+            second.start()
+            self.assertTrue(reconciliation_started.wait(timeout=10))
+            self.assertFalse(reconciliation_done.wait(timeout=0.25))
+            release_publication.set()
+            first.join(timeout=20)
+            second.join(timeout=20)
+
+        self.assertFalse(first.is_alive() or second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertCountEqual(outcomes, ["published", "already_reconciled"])
+        document.refresh_from_db(); version.refresh_from_db()
+        job = ProcessingJob.objects.get(pk=claim.job_id)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.READY)
+        self.assertEqual(document.current_version_id, version.pk)
+        self.assertEqual(job.state, ProcessingJob.State.SUCCEEDED)
+        self.assertEqual(ExtractedTextArtifact.objects.filter(document_version=version).count(), 1)
+        self.assertTrue(self.store.resolve(version.original_artifact.storage_key).exists())
+        self.assertTrue(self.store.resolve(stored.storage_key).exists())
+        self.assertEqual(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_SUCCEEDED,
+            target_id=str(document.pk),
+        ).count(), 1)
+        self.assertFalse(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_FAILED,
+            target_id=str(document.pk),
+        ).exists())
+        self.assertFalse(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_RECONCILED,
+            target_id=str(document.pk),
+        ).exists())
+
+    def test_invalid_artifact_reconciliation_wins_against_publication(self):
+        from documents.jobs import LeaseLost, publish_claim
+        from documents.reconciliation import _artifact_valid as real_artifact_valid
+
+        document, version, claim, stored, characters = self._ready_claim_and_file()
+        original_path = self.store.resolve(version.original_artifact.storage_key)
+        original_path.write_bytes(b"corrupt-after-claim")
+        reconciliation_holds_rows = threading.Event()
+        release_reconciliation = threading.Event()
+        publication_started = threading.Event()
+        publication_done = threading.Event()
+        outcomes = []
+        errors = []
+
+        def hold_artifact_validation(*args, **kwargs):
+            reconciliation_holds_rows.set()
+            if not release_reconciliation.wait(timeout=10):
+                raise AssertionError("Reconciliation release was not signalled")
+            return real_artifact_valid(*args, **kwargs)
+
+        def reconciler():
+            close_old_connections()
+            try:
+                actor = User.objects.get(pk=self.actor.pk)
+                result = execute_recovery_issue(
+                    actor=actor,
+                    issue=RecoveryIssue("invalid_artifact", str(version.pk)),
+                    store=PrivateArtifactStore(),
+                )
+                outcomes.append(result)
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                close_old_connections()
+
+        def publisher():
+            close_old_connections()
+            try:
+                publication_started.set()
+                publish_claim(
+                    claim, stored=stored, character_count=characters, page_count=None,
+                    extractor_version="test", store=self.store,
+                )
+                outcomes.append("published")
+            except LeaseLost:
+                outcomes.append("rejected")
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                publication_done.set()
+                close_old_connections()
+
+        with patch("documents.reconciliation._artifact_valid", side_effect=hold_artifact_validation):
+            first = threading.Thread(target=reconciler)
+            second = threading.Thread(target=publisher)
+            first.start()
+            self.assertTrue(reconciliation_holds_rows.wait(timeout=10))
+            second.start()
+            self.assertTrue(publication_started.wait(timeout=10))
+            self.assertFalse(publication_done.wait(timeout=0.25))
+            release_reconciliation.set()
+            first.join(timeout=20)
+            second.join(timeout=20)
+
+        self.assertFalse(first.is_alive() or second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertCountEqual(outcomes, ["reconciled", "rejected"])
+        document.refresh_from_db(); version.refresh_from_db()
+        job = ProcessingJob.objects.get(pk=claim.job_id)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.FAILED)
+        self.assertIsNone(document.current_version_id)
+        self.assertEqual(job.state, ProcessingJob.State.FAILED)
+        self.assertFalse(ExtractedTextArtifact.objects.filter(document_version=version).exists())
+        self.assertEqual(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_FAILED,
+            target_id=str(document.pk),
+        ).count(), 1)
+        self.assertEqual(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_RECONCILED,
+            target_id=str(document.pk),
+        ).count(), 1)
+        self.assertFalse(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_SUCCEEDED,
+            target_id=str(document.pk),
+        ).exists())
+        self.assertEqual(_compensate_extracted(self.store, stored.storage_key), "deleted")
+        self.assertFalse((self.store.root / stored.storage_key).exists())
 
     def test_concurrent_original_reference_creation_prevents_quarantine(self):
         from django.db import transaction

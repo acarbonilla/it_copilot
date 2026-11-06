@@ -1,16 +1,56 @@
 import hashlib
 import uuid
 
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
 
 from .extraction_isolation import (
     ExtractionInfrastructureFailure,
     ExtractionRejected,
     run_isolated_extraction,
 )
+from .artifact_coordination import lock_artifact_publication
 from .jobs import LeaseLost, claim_next_job, fail_claim, heartbeat, publish_claim
-from .models import OriginalArtifact
+from .models import ExtractedTextArtifact, OriginalArtifact, QuarantinedArtifact
 from .storage import ArtifactStorageError, PrivateArtifactStore
+
+
+class ArtifactCompensationUnresolved(Exception):
+    pass
+
+
+def _compensate_extracted(store, storage_key):
+    """Remove only a definitely unreferenced result under the publication guard."""
+    try:
+        with transaction.atomic():
+            lock_artifact_publication()
+            if (
+                OriginalArtifact.objects.filter(storage_key=storage_key).exists()
+                or ExtractedTextArtifact.objects.filter(storage_key=storage_key).exists()
+            ):
+                return "referenced"
+            if QuarantinedArtifact.objects.filter(storage_key=storage_key).exists():
+                return "quarantined"
+            try:
+                store.delete(storage_key)
+                return "deleted"
+            except ArtifactStorageError:
+                # Missing already means there is nothing left to compensate.
+                return "absent"
+            except Exception:
+                try:
+                    store.quarantine(storage_key)
+                    return "quarantined"
+                except Exception as exc:
+                    raise ArtifactCompensationUnresolved(
+                        "Extracted artifact cleanup requires reconciliation"
+                    ) from exc
+    except ArtifactCompensationUnresolved:
+        raise
+    except Exception as exc:
+        # Reference state is uncertain. Preserve the file for later reconciliation.
+        raise ArtifactCompensationUnresolved(
+            "Extracted artifact reference state could not be verified"
+        ) from exc
 
 
 def _fail_safely(claim, *, error_code, retryable):
@@ -89,12 +129,6 @@ def process_one(*, worker_id=None, store=None, extraction_runner=run_isolated_ex
             return "stale" if state == "stale" else "retry"
     finally:
         if storage_key is not None:
-            try:
-                store.delete(storage_key)
-            except Exception:
-                try:
-                    store.quarantine(storage_key)
-                except Exception:
-                    pass
+            _compensate_extracted(store, storage_key)
         if owned_store:
             store.close()

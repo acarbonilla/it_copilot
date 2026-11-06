@@ -9,7 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
 
-from .models import Document, ExtractedTextArtifact, OriginalArtifact, ProcessingJob
+from .models import Document, DocumentVersion, ExtractedTextArtifact, OriginalArtifact, ProcessingJob
 from .storage import ArtifactInventoryChanged, ArtifactStorageError, PrivateArtifactStore
 
 
@@ -21,6 +21,7 @@ CURSOR_MAX_AGE_SECONDS = 24 * 60 * 60
 CURSOR_MAX_LENGTH = 4096
 HASH_CHUNK_SIZE = 64 * 1024
 CURSOR_SALT = "documents.reconciliation.inventory.v1"
+ASSESSMENT_CURSOR_SALT = "documents.ready-consistency.v1"
 PHASES = ("stale_jobs", "originals", "extracted", "filesystem_originals", "filesystem_extracted", "purge")
 
 
@@ -81,6 +82,149 @@ def _encode_cursor(state, *, actor_id, store):
     if len(token) > CURSOR_MAX_LENGTH:
         raise InventoryCursorError("Inventory cursor is too large")
     return token
+
+
+def _decode_assessment_cursor(cursor, *, actor_id, store, check_physical):
+    if cursor is None:
+        return {"v": 1, "phase": "ready", "position": None}
+    if not isinstance(cursor, str) or not cursor or len(cursor) > CURSOR_MAX_LENGTH:
+        raise InventoryCursorError("Assessment cursor is invalid")
+    try:
+        state = signing.loads(cursor, salt=ASSESSMENT_CURSOR_SALT, max_age=CURSOR_MAX_AGE_SECONDS)
+    except signing.SignatureExpired as exc:
+        raise InventoryCursorError("Assessment cursor has expired") from exc
+    except signing.BadSignature as exc:
+        raise InventoryCursorError("Assessment cursor is invalid") from exc
+    if (
+        not isinstance(state, dict)
+        or state.get("v") != 1
+        or state.get("phase") not in {"ready", "current"}
+        or state.get("actor_id") != str(actor_id)
+        or state.get("root") != _root_binding(store)
+        or state.get("check_physical") is not bool(check_physical)
+    ):
+        raise InventoryCursorError("Assessment cursor scope is invalid")
+    return {"v": 1, "phase": state["phase"], "position": state.get("position")}
+
+
+def _assessment_page(issues, state, *, actor_id, store, check_physical, work, complete=False):
+    cursor = None
+    if not complete:
+        payload = dict(state)
+        payload.update({
+            "actor_id": str(actor_id),
+            "root": _root_binding(store),
+            "check_physical": bool(check_physical),
+        })
+        cursor = signing.dumps(payload, salt=ASSESSMENT_CURSOR_SALT, compress=True)
+        if len(cursor) > CURSOR_MAX_LENGTH:
+            raise InventoryCursorError("Assessment cursor is too large")
+    return RecoveryInventoryPage(tuple(issues), cursor, complete, work)
+
+
+def assess_ready_consistency_page(*, actor_id, store=None, findings_limit=100,
+                                  work_limit=DEFAULT_WORK_LIMIT, cursor=None,
+                                  check_physical=False):
+    """Bounded, read-only assessment of historical READY and current-version rows."""
+    if (isinstance(findings_limit, bool) or not isinstance(findings_limit, int)
+            or findings_limit < 1 or findings_limit > 1000):
+        raise ValueError("Findings limit must be between 1 and 1000")
+    if (isinstance(work_limit, bool) or not isinstance(work_limit, int)
+            or work_limit < 1 or work_limit > MAX_WORK_LIMIT):
+        raise InventoryWorkLimitError("Work limit must be between 1 and 10000")
+    owns_store = store is None
+    store = store or PrivateArtifactStore()
+    work = 0
+    issues = []
+    maximum_chunks = math.ceil((settings.DOCUMENT_MAX_FILE_BYTES + 1) / HASH_CHUNK_SIZE)
+    try:
+        state = _decode_assessment_cursor(
+            cursor, actor_id=actor_id, store=store, check_physical=check_physical,
+        )
+        while True:
+            if work >= work_limit or len(issues) >= findings_limit:
+                return _assessment_page(
+                    issues, state, actor_id=actor_id, store=store,
+                    check_physical=check_physical, work=work,
+                )
+            remaining = work_limit - work
+            if state["phase"] == "ready":
+                query = DocumentVersion.objects.filter(processing_state=DocumentVersion.ProcessingState.READY)
+                if state["position"]:
+                    query = query.filter(id__gt=state["position"])
+                rows = list(query.order_by("id")[:min(DATABASE_BATCH_SIZE, remaining)])
+                if not rows:
+                    state = {"v": 1, "phase": "current", "position": None}
+                    continue
+                for version in rows:
+                    if work >= work_limit or len(issues) >= findings_limit:
+                        return _assessment_page(
+                            issues, state, actor_id=actor_id, store=store,
+                            check_physical=check_physical, work=work,
+                        )
+                    if check_physical and work_limit - work < 1 + (2 * maximum_chunks):
+                        if work == 0:
+                            raise InventoryWorkLimitError(
+                                "Work limit is too small for physical READY assessment"
+                            )
+                        return _assessment_page(
+                            issues, state, actor_id=actor_id, store=store,
+                            check_physical=check_physical, work=work,
+                        )
+                    work += 1
+                    original = OriginalArtifact.objects.filter(document_version=version).first()
+                    extracted = ExtractedTextArtifact.objects.filter(document_version=version).first()
+                    if original is None:
+                        issues.append(RecoveryIssue("ready_missing_original", str(version.pk)))
+                    if extracted is None:
+                        issues.append(RecoveryIssue("ready_missing_extracted", str(version.pk)))
+                    if check_physical:
+                        for kind, artifact in (("original", original), ("extracted", extracted)):
+                            if artifact is None:
+                                continue
+                            valid, used = _bounded_artifact_valid(store, artifact, work_limit - work)
+                            work += used
+                            if not valid:
+                                issues.append(RecoveryIssue(f"ready_invalid_{kind}", str(version.pk)))
+                    state["position"] = str(version.pk)
+                    if len(issues) >= findings_limit:
+                        return _assessment_page(
+                            issues, state, actor_id=actor_id, store=store,
+                            check_physical=check_physical, work=work,
+                        )
+                continue
+            query = Document.objects.exclude(current_version=None)
+            if state["position"]:
+                query = query.filter(id__gt=state["position"])
+            rows = list(query.select_related("current_version").order_by("id")[:min(DATABASE_BATCH_SIZE, remaining)])
+            if not rows:
+                return _assessment_page(
+                    issues, state, actor_id=actor_id, store=store,
+                    check_physical=check_physical, work=work, complete=True,
+                )
+            for document in rows:
+                if work >= work_limit or len(issues) >= findings_limit:
+                    return _assessment_page(
+                        issues, state, actor_id=actor_id, store=store,
+                        check_physical=check_physical, work=work,
+                    )
+                work += 1
+                state["position"] = str(document.pk)
+                version = document.current_version
+                if version.processing_state != DocumentVersion.ProcessingState.READY:
+                    issues.append(RecoveryIssue("current_not_ready", str(document.pk)))
+                if not OriginalArtifact.objects.filter(document_version=version).exists():
+                    issues.append(RecoveryIssue("current_missing_original", str(document.pk)))
+                if not ExtractedTextArtifact.objects.filter(document_version=version).exists():
+                    issues.append(RecoveryIssue("current_missing_extracted", str(document.pk)))
+                if len(issues) >= findings_limit:
+                    return _assessment_page(
+                        issues, state, actor_id=actor_id, store=store,
+                        check_physical=check_physical, work=work,
+                    )
+    finally:
+        if owns_store:
+            store.close()
 
 
 def _parse_datetime(value):

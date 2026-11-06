@@ -1,5 +1,6 @@
 import threading
 import uuid
+import hashlib
 from datetime import timedelta
 from unittest import skipUnless
 from unittest.mock import patch
@@ -12,14 +13,18 @@ from accounts.models import User
 from documents.jobs import JobClaim, LeaseLost, claim_next_job, fail_claim, heartbeat, publish_claim
 from documents.models import (
     ArtifactPublicationGuard, Document, DocumentVersion, ExtractedTextArtifact,
-    ProcessingJob, QuarantinedArtifact,
+    OriginalArtifact, ProcessingJob, QuarantinedArtifact,
 )
 from documents.storage import ArtifactStorageError, StoredArtifact
 from documents.services import archive_document
+from security_audit.models import SecurityAuditEvent
 
 
 class _AvailableStore:
     def resolve(self, storage_key):
+        return storage_key
+
+    def validate_integrity(self, storage_key, *, expected_byte_length, expected_sha256_digest):
         return storage_key
 
 
@@ -34,6 +39,15 @@ def create_pending_job():
         sequence=1,
         processing_state=DocumentVersion.ProcessingState.QUEUED,
         created_by_user_id=owner.pk,
+    )
+    original_id = uuid.uuid4().hex
+    OriginalArtifact.objects.create(
+        document_version=version,
+        storage_key=f"originals/{original_id[:2]}/{original_id}.bin",
+        original_filename="source.txt",
+        sha256_digest=hashlib.sha256(b"original").hexdigest(),
+        byte_length=len(b"original"),
+        detected_media_type="text/plain",
     )
     document.candidate_version = version
     document.save(update_fields=("candidate_version", "updated_at"))
@@ -68,6 +82,9 @@ class ProcessingJobLifecycleTests(TestCase):
         self.assertEqual(job.attempt_count, 3)
         self.assertIsNone(job.nonterminal_slot)
         self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.FAILED)
+        self.assertEqual(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_FAILED,
+        ).count(), 1)
 
     def test_expired_claim_is_reclaimed_and_stale_worker_is_fenced(self):
         _, _, job = create_pending_job()
@@ -102,8 +119,16 @@ class ProcessingJobLifecycleTests(TestCase):
         self.assertEqual(document.current_version_id, version.pk)
         self.assertIsNone(document.candidate_version_id)
         self.assertEqual(job.state, ProcessingJob.State.SUCCEEDED)
+        self.assertEqual(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_SUCCEEDED,
+            target_id=str(document.pk),
+        ).count(), 1)
         with self.assertRaises(LeaseLost):
             publish_claim(claim, stored=stored, character_count=4, page_count=None, extractor_version="test", store=AVAILABLE_STORE)
+        self.assertEqual(SecurityAuditEvent.objects.filter(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_SUCCEEDED,
+            target_id=str(document.pk),
+        ).count(), 1)
 
     def test_quarantine_tombstone_rejects_publication_without_mutation(self):
         document, version, job = create_pending_job()
@@ -123,8 +148,11 @@ class ProcessingJobLifecycleTests(TestCase):
         claim = claim_next_job(worker_id=uuid.uuid4())
         stored = StoredArtifact("extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt", "a" * 64, 4)
         unavailable_store = _AvailableStore()
-        with patch.object(unavailable_store, "resolve", side_effect=ArtifactStorageError("missing")):
-            with self.assertRaises(ArtifactStorageError):
+        with patch.object(
+            unavailable_store, "validate_integrity",
+            side_effect=[None, ArtifactStorageError("missing")],
+        ):
+            with self.assertRaises(LeaseLost):
                 publish_claim(
                     claim, stored=stored, character_count=4, page_count=None,
                     extractor_version="test", store=unavailable_store,
@@ -134,6 +162,89 @@ class ProcessingJobLifecycleTests(TestCase):
         self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
         self.assertIsNone(document.current_version_id)
         self.assertFalse(ExtractedTextArtifact.objects.filter(storage_key=stored.storage_key).exists())
+
+    def test_missing_original_reference_rejects_ready_publication(self):
+        document, version, job = create_pending_job()
+        OriginalArtifact.objects.filter(document_version=version).delete()
+        claim = claim_next_job(worker_id=uuid.uuid4())
+        stored = StoredArtifact("extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt", "a" * 64, 4)
+        with self.assertRaises(LeaseLost):
+            publish_claim(
+                claim, stored=stored, character_count=4, page_count=None,
+                extractor_version="test", store=AVAILABLE_STORE,
+            )
+        document.refresh_from_db(); version.refresh_from_db(); job.refresh_from_db()
+        self.assertIsNone(document.current_version_id)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
+        self.assertEqual(job.state, ProcessingJob.State.RUNNING)
+
+    def test_corrupt_original_or_extracted_rejects_ready_publication(self):
+        for corrupt_original in (True, False):
+            with self.subTest(corrupt_original=corrupt_original):
+                document, version, job = create_pending_job()
+                claim = claim_next_job(worker_id=uuid.uuid4())
+                stored = StoredArtifact(
+                    "extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt",
+                    "a" * 64, 4,
+                )
+                side_effect = (
+                    [ArtifactStorageError("corrupt original")]
+                    if corrupt_original
+                    else [None, ArtifactStorageError("corrupt extracted")]
+                )
+                store = _AvailableStore()
+                with patch.object(store, "validate_integrity", side_effect=side_effect):
+                    with self.assertRaises(LeaseLost):
+                        publish_claim(
+                            claim, stored=stored, character_count=4, page_count=None,
+                            extractor_version="test", store=store,
+                        )
+                document.refresh_from_db(); version.refresh_from_db(); job.refresh_from_db()
+                self.assertIsNone(document.current_version_id)
+                self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
+                self.assertEqual(job.state, ProcessingJob.State.RUNNING)
+
+    def test_original_or_extracted_tombstone_rejects_publication(self):
+        for tombstone_original in (True, False):
+            document, version, _ = create_pending_job()
+            claim = claim_next_job(worker_id=uuid.uuid4())
+            stored = StoredArtifact("extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt", "a" * 64, 4)
+            key = version.original_artifact.storage_key if tombstone_original else stored.storage_key
+            QuarantinedArtifact.objects.create(storage_key=key)
+            with self.assertRaises(LeaseLost):
+                publish_claim(
+                    claim, stored=stored, character_count=4, page_count=None,
+                    extractor_version="test", store=AVAILABLE_STORE,
+                )
+            document.refresh_from_db()
+            self.assertIsNone(document.current_version_id)
+
+    def test_success_audit_failure_rolls_back_complete_publication_bundle(self):
+        document, version, job = create_pending_job()
+        claim = claim_next_job(worker_id=uuid.uuid4())
+        stored = StoredArtifact("extracted/" + version.pk.hex + "/" + uuid.uuid4().hex + ".txt", "a" * 64, 4)
+        with patch("documents.jobs.record_critical_event", side_effect=RuntimeError("audit unavailable")):
+            with self.assertRaises(RuntimeError):
+                publish_claim(
+                    claim, stored=stored, character_count=4, page_count=None,
+                    extractor_version="test", store=AVAILABLE_STORE,
+                )
+        document.refresh_from_db(); version.refresh_from_db(); job.refresh_from_db()
+        self.assertIsNone(document.current_version_id)
+        self.assertEqual(document.candidate_version_id, version.pk)
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
+        self.assertEqual(job.state, ProcessingJob.State.RUNNING)
+        self.assertFalse(ExtractedTextArtifact.objects.filter(storage_key=stored.storage_key).exists())
+
+    def test_terminal_failure_audit_failure_rolls_back_state(self):
+        _, version, job = create_pending_job()
+        claim = claim_next_job(worker_id=uuid.uuid4())
+        with patch("documents.jobs.record_critical_event", side_effect=RuntimeError("audit unavailable")):
+            with self.assertRaises(RuntimeError):
+                fail_claim(claim, error_code="artifact_invalid", retryable=False)
+        version.refresh_from_db(); job.refresh_from_db()
+        self.assertEqual(version.processing_state, DocumentVersion.ProcessingState.PROCESSING)
+        self.assertEqual(job.state, ProcessingJob.State.RUNNING)
 
     def test_cancelled_or_archived_document_cannot_be_claimed(self):
         document, version, job = create_pending_job()

@@ -10,6 +10,12 @@ The prior recovery acceptance entry did not cover the inventory-to-quarantine pu
 
 IC-027 replaces full-store reconciliation enumeration with signed continuation pages, a separate 5,000-unit default work budget (10,000 maximum), 256-row database batches, and deterministic directory snapshots capped at 4,096 entries. Capacity overflow, stale/invalid cursors, and storage/database failures fail closed without claiming completion. The extracted root therefore has an explicit 4,096-version-directory MVP ceiling. Concurrent mutation follows documented forward-scan semantics rather than a point-in-time snapshot. IC-027 is implemented locally and awaits SOL G2 review; F-03 remains at G2 HOLD and PR #22 is not authorized for merge.
 
+## IC-028 READY consistency remediation
+
+IC-028 validates original and extracted physical integrity under the shared publication guard before READY/current/job-success publication, makes processing-success and terminal-failure audits critical and transactional, uses reference-aware fail-closed filesystem compensation, clears invalid current pointers during audited recovery, and adds a bounded read-only historical assessment. Local focused, SQLite regression, and native MySQL concurrency evidence passed; SOL G2 review remains pending and no merge is authorized.
+
+Targeted IC-028 AC-07 evidence now includes deterministic native MySQL publication-first and invalid-reconciliation-first races on the same document/version. Both individual tests and the resulting 10-test concurrency suite passed with zero skips; final state, artifact reference/physical cleanup, lease fencing, and exact critical audit counts are asserted. This closes the identified evidence gap but does not declare SOL G2 acceptance.
+
 F-03 now provides owner-isolated document lifecycle, `IT_DOC_ADMIN` cross-owner management, App Admin metadata-only separation, validated private upload/storage, deterministic processing with Windows isolation, secure same-handle downloads, the management UI, and dry-run-first recovery controls.
 
 ## Security acceptance matrix

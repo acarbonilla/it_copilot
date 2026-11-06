@@ -188,6 +188,24 @@ class PrivateArtifactStore:
             raise ArtifactStorageError("Extracted artifact violates its content bound")
         return StoredArtifact(storage_key, digest.hexdigest(), byte_length), len(text)
 
+    def validate_integrity(self, storage_key, *, expected_byte_length, expected_sha256_digest):
+        """Stream and validate one private artifact without materializing its content."""
+        path = self.resolve(storage_key)
+        digest = hashlib.sha256()
+        byte_length = 0
+        try:
+            with path.open("rb") as source:
+                while chunk := source.read(64 * 1024):
+                    byte_length += len(chunk)
+                    if byte_length > settings.DOCUMENT_MAX_FILE_BYTES:
+                        raise ArtifactStorageError("Artifact exceeds the configured file limit")
+                    digest.update(chunk)
+        except OSError as exc:
+            raise ArtifactStorageError("Artifact is unavailable") from exc
+        if byte_length != expected_byte_length or digest.hexdigest() != expected_sha256_digest:
+            raise ArtifactStorageError("Artifact integrity check failed")
+        return path
+
     def delete(self, storage_key):
         path = self.resolve(storage_key)
         path.unlink()

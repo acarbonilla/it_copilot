@@ -13,8 +13,8 @@ from django.test import TestCase, override_settings
 from accounts.models import User
 from documents.extraction_isolation import ExtractionResult
 from documents.models import DocumentVersion, ExtractedTextArtifact, ProcessingJob
-from documents.processor import process_one
-from documents.storage import PrivateArtifactStore
+from documents.processor import ArtifactCompensationUnresolved, _compensate_extracted, process_one
+from documents.storage import PrivateArtifactStore, StoredArtifact
 from documents.uploads import create_document_upload
 
 
@@ -96,6 +96,28 @@ class DocumentProcessorTests(TestCase):
             self.assertEqual(process_one(worker_id=uuid.uuid4(), store=self.store, extraction_runner=runner), "retry")
         self.assertEqual(list((self.root / "extracted").rglob("*.txt")), [])
         self.assertFalse(ExtractedTextArtifact.objects.exists())
+
+    def test_compensation_preserves_referenced_artifact(self):
+        uploaded = self.upload()
+        key, path = self.store.allocate_extracted_path(uploaded.version.pk)
+        path.write_text("referenced", encoding="utf-8")
+        stored, characters = self.store.inspect_text(key)
+        ExtractedTextArtifact.objects.create(
+            document_version=uploaded.version, storage_key=key,
+            sha256_digest=stored.sha256_digest, byte_length=stored.byte_length,
+            character_count=characters, extractor_version="test",
+        )
+        self.assertEqual(_compensate_extracted(self.store, key), "referenced")
+        self.assertTrue(path.exists())
+
+    def test_compensation_preserves_file_when_reference_check_is_unavailable(self):
+        uploaded = self.upload()
+        key, path = self.store.allocate_extracted_path(uploaded.version.pk)
+        path.write_text("uncertain", encoding="utf-8")
+        with patch("documents.processor.lock_artifact_publication", side_effect=DatabaseError("database unavailable")):
+            with self.assertRaises(ArtifactCompensationUnresolved):
+                _compensate_extracted(self.store, key)
+        self.assertTrue(path.exists())
 
     def test_command_log_contains_no_filename_or_content(self):
         self.upload(b"SYNTHETIC_WORKER_SECRET")

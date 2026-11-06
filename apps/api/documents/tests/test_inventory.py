@@ -17,7 +17,10 @@ from django.utils import timezone
 
 from accounts.models import User
 from documents import inventory
-from documents.inventory import InventoryCursorError, RecoveryIssue, inventory_recovery_page
+from documents.inventory import (
+    InventoryCursorError, RecoveryIssue, assess_ready_consistency_page,
+    inventory_recovery_page,
+)
 from documents.models import Document, DocumentVersion, ExtractedTextArtifact, OriginalArtifact, QuarantinedArtifact
 from documents.storage import (
     ArtifactInventoryCapacityExceeded,
@@ -220,6 +223,32 @@ class BoundedArtifactInventoryTests(TestCase):
         self.assertTrue((self.root / key).exists())
         with self.assertRaises(CommandError):
             call_command("reconcile_documents", actor_id=actor.pk, work_limit=10001)
+
+    def test_historical_ready_assessment_is_bounded_read_only_and_continuable(self):
+        owner = User.objects.create_user("assessment-owner@example.test", None, it_role=User.ITRole.IT_MEMBER)
+        documents = [Document(owner=owner, title=f"Historical {index}") for index in range(257)]
+        Document.objects.bulk_create(documents)
+        DocumentVersion.objects.bulk_create([
+            DocumentVersion(
+                document=document, sequence=1,
+                processing_state=DocumentVersion.ProcessingState.READY,
+                created_by_user_id=owner.pk,
+            )
+            for document in documents
+        ])
+        first = assess_ready_consistency_page(
+            actor_id=self.actor_id, store=self.store, findings_limit=1000, work_limit=256,
+        )
+        self.assertFalse(first.complete)
+        self.assertEqual(first.work_performed, 256)
+        self.assertEqual(len(first.issues), 512)
+        second = assess_ready_consistency_page(
+            actor_id=self.actor_id, store=self.store, findings_limit=1000,
+            work_limit=256, cursor=first.next_cursor,
+        )
+        self.assertTrue(second.complete)
+        self.assertEqual(len(second.issues), 2)
+        self.assertEqual(DocumentVersion.objects.filter(processing_state=DocumentVersion.ProcessingState.READY).count(), 257)
 
 
 @skipUnless(connection.vendor == "mysql", "Native MySQL keyset evidence")

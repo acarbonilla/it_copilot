@@ -7,12 +7,16 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
-from .models import Document, DocumentVersion, ExtractedTextArtifact, ProcessingJob
+from security_audit.models import SecurityAuditEvent
+from security_audit.services import record_critical_event
+
+from .models import Document, DocumentVersion, ExtractedTextArtifact, OriginalArtifact, ProcessingJob
 from .artifact_coordination import (
     ArtifactPublicationRejected,
     lock_artifact_publication,
     reject_quarantined_key,
 )
+from .storage import ArtifactStorageError
 
 
 RETRY_DELAYS_SECONDS = (5, 30)
@@ -49,6 +53,58 @@ def _terminalize(job, state, now, error_code=""):
             "cancellation_requested", "completed_at", "last_error_code", "updated_at",
         )
     )
+
+
+def _audit_processing_failure(document):
+    record_critical_event(
+        action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_FAILED,
+        actor_user_id=None,
+        target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT,
+        target_id=str(document.pk),
+        outcome=SecurityAuditEvent.Outcome.FAILURE,
+    )
+
+
+def _validate_ready_artifacts(*, version, stored, character_count, page_count, extractor_version, store):
+    try:
+        original = OriginalArtifact.objects.select_for_update().get(document_version=version)
+    except OriginalArtifact.DoesNotExist as exc:
+        raise PublicationRejected("Original artifact reference is unavailable") from exc
+    try:
+        reject_quarantined_key(original.storage_key)
+        reject_quarantined_key(stored.storage_key)
+    except ArtifactPublicationRejected as exc:
+        raise PublicationRejected(str(exc)) from exc
+    if (
+        isinstance(character_count, bool)
+        or not isinstance(character_count, int)
+        or character_count < 1
+        or character_count > settings.DOCUMENT_EXTRACTION_MAX_CHARACTERS
+        or stored.byte_length < 1
+        or (page_count is not None and (
+            isinstance(page_count, bool)
+            or not isinstance(page_count, int)
+            or page_count < 1
+            or page_count > settings.DOCUMENT_MAX_PDF_PAGES
+        ))
+        or not isinstance(extractor_version, str)
+        or not extractor_version.strip()
+        or len(extractor_version) > 64
+    ):
+        raise PublicationRejected("Extracted artifact metadata is invalid")
+    try:
+        store.validate_integrity(
+            original.storage_key,
+            expected_byte_length=original.byte_length,
+            expected_sha256_digest=original.sha256_digest,
+        )
+        store.validate_integrity(
+            stored.storage_key,
+            expected_byte_length=stored.byte_length,
+            expected_sha256_digest=stored.sha256_digest,
+        )
+    except ArtifactStorageError as exc:
+        raise PublicationRejected("Artifact validation failed") from exc
 
 
 def claim_next_job(*, worker_id, now=None):
@@ -99,11 +155,13 @@ def claim_next_job(*, worker_id, now=None):
                 _terminalize(job, ProcessingJob.State.CANCELLED, now, "document_unavailable")
                 version.processing_state = DocumentVersion.ProcessingState.CANCELLED
                 version.save(update_fields=("processing_state", "updated_at"))
+                _audit_processing_failure(document)
                 continue
             if job.attempt_count >= 3:
                 _terminalize(job, ProcessingJob.State.FAILED, now, "retry_exhausted")
                 version.processing_state = DocumentVersion.ProcessingState.FAILED
                 version.save(update_fields=("processing_state", "updated_at"))
+                _audit_processing_failure(document)
                 continue
             job.attempt_count += 1
             job.state = ProcessingJob.State.RUNNING
@@ -158,9 +216,11 @@ def fail_claim(claim, *, error_code, retryable, now=None):
     now = now or timezone.now()
     with transaction.atomic():
         job, version, document = _locked_claim(claim, now)
+        terminal = False
         if job.cancellation_requested or document.visibility != Document.Visibility.ACTIVE:
             _terminalize(job, ProcessingJob.State.CANCELLED, now, "cancelled")
             version.processing_state = DocumentVersion.ProcessingState.CANCELLED
+            terminal = True
         elif retryable and job.attempt_count < 3:
             delay = RETRY_DELAYS_SECONDS[job.attempt_count - 1]
             job.state = ProcessingJob.State.RETRY_WAIT
@@ -179,7 +239,10 @@ def fail_claim(claim, *, error_code, retryable, now=None):
         else:
             _terminalize(job, ProcessingJob.State.FAILED, now, error_code[:32])
             version.processing_state = DocumentVersion.ProcessingState.FAILED
+            terminal = True
         version.save(update_fields=("processing_state", "updated_at"))
+        if terminal:
+            _audit_processing_failure(document)
         return job.state
 
 
@@ -187,11 +250,6 @@ def publish_claim(claim, *, stored, character_count, page_count, extractor_versi
     now = now or timezone.now()
     with transaction.atomic():
         lock_artifact_publication()
-        try:
-            reject_quarantined_key(stored.storage_key)
-        except ArtifactPublicationRejected as exc:
-            raise PublicationRejected(str(exc)) from exc
-        store.resolve(stored.storage_key)
         job, version, document = _locked_claim(claim, now)
         if (
             job.cancellation_requested
@@ -200,6 +258,14 @@ def publish_claim(claim, *, stored, character_count, page_count, extractor_versi
             or version.processing_state != DocumentVersion.ProcessingState.PROCESSING
         ):
             raise PublicationRejected("Processing result is stale")
+        _validate_ready_artifacts(
+            version=version,
+            stored=stored,
+            character_count=character_count,
+            page_count=page_count,
+            extractor_version=extractor_version,
+            store=store,
+        )
         artifact = ExtractedTextArtifact.objects.create(
             document_version=version,
             storage_key=stored.storage_key,
@@ -215,6 +281,13 @@ def publish_claim(claim, *, stored, character_count, page_count, extractor_versi
         document.candidate_version = None
         document.save(update_fields=("current_version", "candidate_version", "updated_at"))
         _terminalize(job, ProcessingJob.State.SUCCEEDED, now)
+        record_critical_event(
+            action=SecurityAuditEvent.Action.DOCUMENT_PROCESSING_SUCCEEDED,
+            actor_user_id=None,
+            target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT,
+            target_id=str(document.pk),
+            outcome=SecurityAuditEvent.Outcome.SUCCESS,
+        )
         return artifact
 
 
@@ -231,3 +304,4 @@ def cancel_document_jobs(document, *, now=None):
         version = job.document_version
         version.processing_state = DocumentVersion.ProcessingState.CANCELLED
         version.save(update_fields=("processing_state", "updated_at"))
+        _audit_processing_failure(document)
