@@ -1,12 +1,17 @@
 # F-03 — Documentation Management
 
-**Status:** G2 HOLD — IC-026 implemented locally; native MySQL concurrency suite passed 7 tests; IC-026 SOL G2 review pending; PR #22 is not authorized for merge
+**Status:** F-03 G2 PASS WITH ACCEPTED LIMITATIONS — accepted functional baseline finalized by IC-029A; future integration remains subject to PO authorization; PR #22 is not authorized for merge
 
-> Reconciliation safety update (IC-026): orphan quarantine and artifact publication share a singleton database lock. Quarantine revalidates both artifact reference tables at execution time and records a durable tombstone to fence late publication. The original native MySQL concurrency suite passed 7 tests; IC-026-R01 records additional remediation evidence. IC-026 remains pending SOL G2 review.
+**Consolidated acceptance head:** `ae48121003322bc61c5e539fd5eb73b739fd201f`
+**Consolidated verification date:** 2026-11-06
 
-> Inventory resource-control update (IC-027): reconciliation now separates findings from a bounded work budget and uses signed continuation cursors, 256-row keyset batches, and deterministic directory snapshots capped at 4,096 entries. Overflow and invalid/stale continuation fail closed. The extracted root has an explicit 4,096-version-directory MVP ceiling, and concurrent changes use forward-scan rather than snapshot semantics. IC-027 awaits SOL G2 review.
+> IC-029 consolidated acceptance: the committed IC-026, IC-027, and IC-028 remediations were reverified through the complete 120-test document suite and a 12-test native MySQL concurrency suite. Current frontend unit, TypeScript, and ESLint checks also passed. No Critical or High blocker was observed. SOL accepted F-03 G2 PASS WITH ACCEPTED LIMITATIONS. PR #22 remains unauthorized for merge, and the PO retains the future integration decision. The remediation notes below preserve their historical gate context.
 
-> READY consistency update (IC-028): processing success now validates both physical artifacts under the IC-026 publication guard and commits extracted reference, READY/current state, job success, and critical audit atomically. Terminal processing failure is critically audited, uncertain cleanup preserves files, invalid recovery clears the affected current pointer, and historical assessment is bounded/read-only. IC-028 awaits SOL G2 review.
+> Historical reconciliation gate (IC-026): orphan quarantine and artifact publication share a singleton database lock. Quarantine revalidates both artifact reference tables at execution time and records a durable tombstone to fence late publication. The original native MySQL concurrency suite passed 7 tests; IC-026-R01 records additional remediation evidence. IC-026 remained pending at this checkpoint before consolidated acceptance.
+
+> Historical inventory gate (IC-027): reconciliation now separates findings from a bounded work budget and uses signed continuation cursors, 256-row keyset batches, and deterministic directory snapshots capped at 4,096 entries. Overflow and invalid/stale continuation fail closed. The extracted root has an explicit 4,096-version-directory MVP ceiling, and concurrent changes use forward-scan rather than snapshot semantics. IC-027 awaited review at this checkpoint before consolidated acceptance.
+
+> Historical READY-consistency gate (IC-028): processing success now validates both physical artifacts under the IC-026 publication guard and commits extracted reference, READY/current state, job success, and critical audit atomically. Terminal processing failure is critically audited, uncertain cleanup preserves files, invalid recovery clears the affected current pointer, and historical assessment is bounded/read-only. IC-028 awaited review at this checkpoint before consolidated acceptance.
 **Branch:** `feature/documentation-management`
 **Verified planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
 **Product Owner authorization:** Ratified IC-009 through IC-017 and bounded Batches A-E, subject to exact-head SOL G2 boundaries
