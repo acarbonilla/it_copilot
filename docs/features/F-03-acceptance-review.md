@@ -6,6 +6,10 @@
 
 The prior recovery acceptance entry did not cover the inventory-to-quarantine publication race. IC-026 adds shared database serialization, execution-time reference validation, quarantine tombstones, fail-closed audit recovery, and controlled concurrency regressions. Its original native MySQL concurrency suite passed 7 tests; IC-026-R01 adds separate lock-failure, real-upload race, and restore-failure evidence. The remediation is not accepted until SOL/PO review the exact commit. Other outstanding F-03 findings remain unaffected.
 
+## IC-027 bounded inventory remediation
+
+IC-027 replaces full-store reconciliation enumeration with signed continuation pages, a separate 5,000-unit default work budget (10,000 maximum), 256-row database batches, and deterministic directory snapshots capped at 4,096 entries. Capacity overflow, stale/invalid cursors, and storage/database failures fail closed without claiming completion. The extracted root therefore has an explicit 4,096-version-directory MVP ceiling. Concurrent mutation follows documented forward-scan semantics rather than a point-in-time snapshot. IC-027 is implemented locally and awaits SOL G2 review; F-03 remains at G2 HOLD and PR #22 is not authorized for merge.
+
 F-03 now provides owner-isolated document lifecycle, `IT_DOC_ADMIN` cross-owner management, App Admin metadata-only separation, validated private upload/storage, deterministic processing with Windows isolation, secure same-handle downloads, the management UI, and dry-run-first recovery controls.
 
 ## Security acceptance matrix

@@ -3,6 +3,8 @@
 **Status:** G2 HOLD — IC-026 implemented locally; native MySQL concurrency suite passed 7 tests; IC-026 SOL G2 review pending; PR #22 is not authorized for merge
 
 > Reconciliation safety update (IC-026): orphan quarantine and artifact publication share a singleton database lock. Quarantine revalidates both artifact reference tables at execution time and records a durable tombstone to fence late publication. The original native MySQL concurrency suite passed 7 tests; IC-026-R01 records additional remediation evidence. IC-026 remains pending SOL G2 review.
+
+> Inventory resource-control update (IC-027): reconciliation now separates findings from a bounded work budget and uses signed continuation cursors, 256-row keyset batches, and deterministic directory snapshots capped at 4,096 entries. Overflow and invalid/stale continuation fail closed. The extracted root has an explicit 4,096-version-directory MVP ceiling, and concurrent changes use forward-scan rather than snapshot semantics. IC-027 awaits SOL G2 review.
 **Branch:** `feature/documentation-management`
 **Verified planning baseline:** `b3adb37a6ac029053b4215ba08067de1427ab993`
 **Product Owner authorization:** Ratified IC-009 through IC-017 and bounded Batches A-E, subject to exact-head SOL G2 boundaries

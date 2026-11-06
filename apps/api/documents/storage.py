@@ -23,11 +23,26 @@ class ArtifactTooLarge(ArtifactStorageError):
     pass
 
 
+class ArtifactInventoryCapacityExceeded(ArtifactStorageError):
+    pass
+
+
+class ArtifactInventoryChanged(ArtifactStorageError):
+    pass
+
+
 @dataclass(frozen=True)
 class StoredArtifact:
     storage_key: str
     sha256_digest: str
     byte_length: int
+
+
+@dataclass(frozen=True)
+class ArtifactDirectorySnapshot:
+    names: tuple[str, ...]
+    digest: str
+    work: int
 
 
 def _is_reparse_point(path):
@@ -203,6 +218,62 @@ class PrivateArtifactStore:
                 self.resolve(key)
                 keys.append(key)
         return sorted(keys)
+
+    def inventory_directory_snapshot(self, *, namespace, directory=None, entry_cap=4096):
+        """Return one deterministic, bounded directory snapshot for reconciliation."""
+        if namespace == "originals":
+            if directory is None:
+                root = self.root / "originals"
+                expect_directories = True
+            elif isinstance(directory, str) and re.fullmatch(r"[0-9a-f]{2}", directory):
+                root = self.root / "originals" / directory
+                expect_directories = False
+            else:
+                raise ArtifactStorageError("Artifact inventory directory is invalid")
+        elif namespace == "extracted":
+            if directory is None:
+                root = self.root / "extracted"
+                expect_directories = True
+            elif isinstance(directory, str) and re.fullmatch(r"[0-9a-f]{32}", directory):
+                root = self.root / "extracted" / directory
+                expect_directories = False
+            else:
+                raise ArtifactStorageError("Artifact inventory directory is invalid")
+        else:
+            raise ArtifactStorageError("Artifact inventory namespace is invalid")
+        if not isinstance(entry_cap, int) or isinstance(entry_cap, bool) or entry_cap < 1:
+            raise ArtifactStorageError("Artifact inventory capacity is invalid")
+        if not root.exists():
+            return ArtifactDirectorySnapshot((), hashlib.sha256(b"").hexdigest(), 1)
+        if not root.is_dir() or _is_reparse_point(root):
+            raise ArtifactStorageError("Artifact inventory contains an invalid directory")
+        before = root.stat()
+        entries = []
+        with os.scandir(root) as iterator:
+            for entry in iterator:
+                if len(entries) >= entry_cap:
+                    raise ArtifactInventoryCapacityExceeded("Artifact inventory directory capacity exceeded")
+                path = Path(entry.path)
+                if _is_reparse_point(path):
+                    raise ArtifactStorageError("Artifact inventory contains a reparse point")
+                is_directory = entry.is_dir(follow_symlinks=False)
+                if is_directory != expect_directories:
+                    raise ArtifactStorageError("Artifact inventory contains an unexpected entry type")
+                name = entry.name
+                if expect_directories:
+                    pattern = r"[0-9a-f]{2}" if namespace == "originals" else r"[0-9a-f]{32}"
+                    if not re.fullmatch(pattern, name):
+                        raise ArtifactStorageError("Artifact inventory contains an invalid directory")
+                else:
+                    key = f"{namespace}/{directory}/{name}"
+                    self.resolve(key)
+                entries.append(name)
+        after = root.stat()
+        if (before.st_dev, before.st_ino, before.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_mtime_ns):
+            raise ArtifactInventoryChanged("Artifact inventory changed during traversal")
+        names = tuple(sorted(entries))
+        digest = hashlib.sha256("\0".join(names).encode("ascii")).hexdigest()
+        return ArtifactDirectorySnapshot(names, digest, len(entries) + 1)
 
     def restore_quarantined(self, quarantine_path, storage_key):
         quarantine_root = (self.root / "quarantine").resolve(strict=True)

@@ -1,7 +1,5 @@
 import hashlib
 import uuid
-from dataclasses import dataclass
-from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -15,13 +13,8 @@ from .jobs import _terminalize
 from .models import Document, DocumentVersion, ExtractedTextArtifact, OriginalArtifact, ProcessingJob
 from .models import QuarantinedArtifact
 from .artifact_coordination import lock_artifact_publication
+from .inventory import RecoveryIssue, inventory_recovery_page
 from .storage import ArtifactStorageError, PrivateArtifactStore
-
-
-@dataclass(frozen=True)
-class RecoveryIssue:
-    kind: str
-    identifier: str
 
 
 def validate_recovery_actor(actor):
@@ -44,28 +37,10 @@ def _artifact_valid(store, artifact):
 
 
 def inventory_recovery_issues(*, store=None, now=None, limit=100):
-    store = store or PrivateArtifactStore(); now = now or timezone.now(); issues = []
-    try:
-        for job_id in ProcessingJob.objects.filter(state=ProcessingJob.State.RUNNING,
-                lease_expires_at__lte=now).order_by("lease_expires_at", "id").values_list("pk", flat=True):
-            issues.append(RecoveryIssue("stale_job", str(job_id)))
-        artifacts = list(OriginalArtifact.objects.select_related("document_version")[:limit])
-        artifacts += list(ExtractedTextArtifact.objects.select_related("document_version")[:limit])
-        for artifact in artifacts:
-            if not _artifact_valid(store, artifact):
-                issues.append(RecoveryIssue("invalid_artifact", str(artifact.document_version_id)))
-        known = set(OriginalArtifact.objects.values_list("storage_key", flat=True))
-        known.update(ExtractedTextArtifact.objects.values_list("storage_key", flat=True))
-        for key in store.inventory_keys():
-            if key not in known:
-                issues.append(RecoveryIssue("orphan_artifact", key))
-        cutoff = now - timedelta(days=30)
-        for document_id in Document.objects.filter(visibility=Document.Visibility.DELETED,
-                deleted_at__lte=cutoff).order_by("deleted_at", "id").values_list("pk", flat=True):
-            issues.append(RecoveryIssue("purge_eligible", str(document_id)))
-        return issues[:limit]
-    finally:
-        if store is not None: store.close()
+    page = inventory_recovery_page(
+        actor_id=0, store=store, now=now, findings_limit=limit,
+    )
+    return list(page.issues)
 
 
 def _audit(actor, target_type, target_id):
