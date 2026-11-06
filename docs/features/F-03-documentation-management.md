@@ -1,9 +1,12 @@
 # F-03 — Documentation Management
 
-**Status:** F-03 G2 PASS WITH ACCEPTED LIMITATIONS — accepted functional baseline finalized by IC-029A; future integration remains subject to PO authorization; PR #22 is not authorized for merge
+**Status:** F-03 G2 PASS WITH ACCEPTED LIMITATIONS — merged to `main` through PR #22 and post-merge verified by IC-030
 
 **Consolidated acceptance head:** `ae48121003322bc61c5e539fd5eb73b739fd201f`
 **Consolidated verification date:** 2026-11-06
+**Integration merge commit:** `19ea923e2698a085afac6a145fda70c7f6974b83`
+
+> IC-030 integration: PR #22 merged the accepted feature head `7bbb4c663a7daebe659e700dd0240556f6cc86ff` into `main`. Post-merge migration consistency, Django system checks, 63 focused backend tests, 36 frontend tests, and TypeScript checks passed. Accepted limitations remain unchanged.
 
 > IC-029 consolidated acceptance: the committed IC-026, IC-027, and IC-028 remediations were reverified through the complete 120-test document suite and a 12-test native MySQL concurrency suite. Current frontend unit, TypeScript, and ESLint checks also passed. No Critical or High blocker was observed. SOL accepted F-03 G2 PASS WITH ACCEPTED LIMITATIONS. PR #22 remains unauthorized for merge, and the PO retains the future integration decision. The remediation notes below preserve their historical gate context.
 

@@ -1,9 +1,12 @@
 # F-03 Final Acceptance Review
 
-**Status:** F-03 G2 PASS WITH ACCEPTED LIMITATIONS — accepted functional baseline finalized by IC-029A; future integration remains subject to PO authorization; PR #22 is not authorized for merge
+**Status:** F-03 G2 PASS WITH ACCEPTED LIMITATIONS — merged to `main` through PR #22 and post-merge verified by IC-030
 
 **Acceptance head:** `ae48121003322bc61c5e539fd5eb73b739fd201f`
 **Acceptance verification date:** 2026-11-06
+**Integration merge commit:** `19ea923e2698a085afac6a145fda70c7f6974b83`
+
+PR #22 merged the accepted feature head `7bbb4c663a7daebe659e700dd0240556f6cc86ff` into `main` on 2026-11-06. IC-030 post-merge smoke verification passed; the accepted limitations below remain in force.
 
 ## IC-026 orphan quarantine remediation
 
