@@ -15,6 +15,16 @@ ACTION_VALUES = (
     "account.role_changed",
     "account.deletion_review_requested",
     "authorization.denied",
+    "document.created",
+    "document.metadata_updated",
+    "document.archived",
+    "document.restored",
+    "document.deleted",
+    "document.upload_created",
+    "document.retry_requested",
+    "document.reconciled",
+    "document.processing_succeeded",
+    "document.processing_failed",
 )
 TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource")
 OUTCOME_VALUES = ("success", "denied", "failure")
@@ -34,6 +44,16 @@ class SecurityAuditEvent(models.Model):
         ACCOUNT_ROLE_CHANGED = "account.role_changed", "Account role changed"
         ACCOUNT_DELETION_REVIEW_REQUESTED = "account.deletion_review_requested", "Account deletion review requested"
         AUTHORIZATION_DENIED = "authorization.denied", "Authorization denied"
+        DOCUMENT_CREATED = "document.created", "Document created"
+        DOCUMENT_METADATA_UPDATED = "document.metadata_updated", "Document metadata updated"
+        DOCUMENT_ARCHIVED = "document.archived", "Document archived"
+        DOCUMENT_RESTORED = "document.restored", "Document restored"
+        DOCUMENT_DELETED = "document.deleted", "Document deleted"
+        DOCUMENT_UPLOAD_CREATED = "document.upload_created", "Document upload created"
+        DOCUMENT_RETRY_REQUESTED = "document.retry_requested", "Document processing retry requested"
+        DOCUMENT_RECONCILED = "document.reconciled", "Document recovery reconciled"
+        DOCUMENT_PROCESSING_SUCCEEDED = "document.processing_succeeded", "Document processing succeeded"
+        DOCUMENT_PROCESSING_FAILED = "document.processing_failed", "Document processing failed"
 
     class TargetType(models.TextChoices):
         ACCOUNT = "account", "Account"

@@ -1,0 +1,239 @@
+from dataclasses import dataclass
+
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.utils import timezone
+
+from security_audit.models import SecurityAuditEvent
+from security_audit.services import record_critical_event, record_denied_event_best_effort
+from accounts.models import User
+
+from .models import Document, DocumentVersion, ProcessingJob
+from .policies import DocumentCapability, authorize_document
+
+
+class DocumentConflictError(Exception):
+    pass
+
+
+class DocumentUnavailableError(PermissionDenied):
+    pass
+
+
+class _DocumentUnavailable(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class LifecycleResult:
+    document: Document
+    previous_visibility: str
+
+
+def _actor_id(actor):
+    return getattr(actor, "pk", None)
+
+
+def _audit_unavailable(actor):
+    # Deliberately omit the supplied identifier. Restricted audit data must not
+    # distinguish an existing cross-owner document from a missing/deleted one.
+    record_denied_event_best_effort(
+        action=SecurityAuditEvent.Action.AUTHORIZATION_DENIED,
+        actor_user_id=_actor_id(actor),
+        target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT,
+        target_id=None,
+    )
+
+
+def _require(actor, capability, document=None):
+    decision = authorize_document(actor, capability, document=document)
+    if not decision.allowed:
+        _audit_unavailable(actor)
+        raise PermissionDenied("Document operation is not permitted")
+
+
+def _fresh_actor(actor):
+    actor_id = _actor_id(actor)
+    if not actor_id:
+        return None
+    return User.objects.filter(pk=actor_id).first()
+
+
+def _locked_authorized_document(*, actor, capability, document_id):
+    fresh_actor = _fresh_actor(actor)
+    try:
+        document = Document.objects.select_for_update().filter(pk=document_id).first()
+    except (ValidationError, ValueError, TypeError) as exc:
+        raise _DocumentUnavailable from exc
+    if document is None or not authorize_document(fresh_actor, capability, document=document).allowed:
+        raise _DocumentUnavailable
+    return fresh_actor, document
+
+
+def _raise_unavailable(actor):
+    _audit_unavailable(actor)
+    raise DocumentUnavailableError("Document is unavailable") from None
+
+
+def _clean_text(value, *, field, max_length, allow_blank=False):
+    if not isinstance(value, str):
+        raise ValidationError({field: "Must be a string"})
+    value = value.strip()
+    if not value and not allow_blank:
+        raise ValidationError({field: "Must not be blank"})
+    if len(value) > max_length:
+        raise ValidationError({field: "Value is too long"})
+    return value
+
+
+def create_document(*, actor, title, description=""):
+    actor = _fresh_actor(actor)
+    _require(actor, DocumentCapability.CREATE)
+    with transaction.atomic():
+        document = Document.objects.create(
+            owner=actor,
+            title=_clean_text(title, field="title", max_length=200),
+            description=_clean_text(description, field="description", max_length=2000, allow_blank=True),
+        )
+        record_critical_event(
+            action=SecurityAuditEvent.Action.DOCUMENT_CREATED,
+            actor_user_id=actor.pk,
+            target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT,
+            target_id=str(document.pk),
+            outcome=SecurityAuditEvent.Outcome.SUCCESS,
+        )
+        return document
+
+
+def update_document_metadata(*, actor, document_id, expected_revision, title=None, description=None):
+    try:
+        with transaction.atomic():
+            fresh_actor, document = _locked_authorized_document(
+                actor=actor,
+                capability=DocumentCapability.EDIT_METADATA,
+                document_id=document_id,
+            )
+            if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) or expected_revision <= 0:
+                raise ValidationError({"expected_revision": "Must be a positive integer"})
+            if document.metadata_revision != expected_revision:
+                raise DocumentConflictError("Document was modified by another request")
+            fields = []
+            if title is not None:
+                document.title = _clean_text(title, field="title", max_length=200)
+                fields.append("title")
+            if description is not None:
+                document.description = _clean_text(description, field="description", max_length=2000, allow_blank=True)
+                fields.append("description")
+            if not fields:
+                raise ValidationError("At least one metadata field is required")
+            document.metadata_revision += 1
+            document.save(update_fields=(*fields, "metadata_revision", "updated_at"))
+            record_critical_event(
+                action=SecurityAuditEvent.Action.DOCUMENT_METADATA_UPDATED,
+                actor_user_id=fresh_actor.pk,
+                target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT,
+                target_id=str(document.pk),
+                outcome=SecurityAuditEvent.Outcome.SUCCESS,
+            )
+            return document
+    except _DocumentUnavailable:
+        _raise_unavailable(actor)
+
+
+def _transition(*, actor, document_id, expected_revision, from_states, to_state, action):
+    capability = {
+        Document.Visibility.ARCHIVED: DocumentCapability.ARCHIVE,
+        Document.Visibility.ACTIVE: DocumentCapability.RESTORE,
+        Document.Visibility.DELETED: DocumentCapability.DELETE,
+    }[to_state]
+    try:
+        with transaction.atomic():
+            fresh_actor, document = _locked_authorized_document(
+                actor=actor,
+                capability=capability,
+                document_id=document_id,
+            )
+            if document.metadata_revision != expected_revision:
+                raise DocumentConflictError("Document was modified by another request")
+            if document.visibility not in from_states:
+                raise DocumentConflictError("Document lifecycle transition is not allowed")
+            previous = document.visibility
+            if to_state in {Document.Visibility.ARCHIVED, Document.Visibility.DELETED}:
+                from .jobs import cancel_document_jobs
+
+                cancel_document_jobs(document)
+            document.visibility = to_state
+            document.metadata_revision += 1
+            document.deleted_at = timezone.now() if to_state == Document.Visibility.DELETED else None
+            document.save(update_fields=("visibility", "metadata_revision", "deleted_at", "updated_at"))
+            record_critical_event(
+                action=action,
+                actor_user_id=fresh_actor.pk,
+                target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT,
+                target_id=str(document.pk),
+                outcome=SecurityAuditEvent.Outcome.SUCCESS,
+            )
+            return LifecycleResult(document=document, previous_visibility=previous)
+    except _DocumentUnavailable:
+        _raise_unavailable(actor)
+
+
+def archive_document(*, actor, document_id, expected_revision):
+    return _transition(
+        actor=actor,
+        document_id=document_id,
+        expected_revision=expected_revision,
+        from_states={Document.Visibility.ACTIVE},
+        to_state=Document.Visibility.ARCHIVED,
+        action=SecurityAuditEvent.Action.DOCUMENT_ARCHIVED,
+    )
+
+
+def restore_document(*, actor, document_id, expected_revision):
+    return _transition(
+        actor=actor,
+        document_id=document_id,
+        expected_revision=expected_revision,
+        from_states={Document.Visibility.ARCHIVED},
+        to_state=Document.Visibility.ACTIVE,
+        action=SecurityAuditEvent.Action.DOCUMENT_RESTORED,
+    )
+
+
+def delete_document(*, actor, document_id, expected_revision):
+    return _transition(
+        actor=actor,
+        document_id=document_id,
+        expected_revision=expected_revision,
+        from_states={Document.Visibility.ACTIVE, Document.Visibility.ARCHIVED},
+        to_state=Document.Visibility.DELETED,
+        action=SecurityAuditEvent.Action.DOCUMENT_DELETED,
+    )
+
+
+def retry_document_processing(*, actor, document_id, version_id, expected_revision):
+    try:
+        with transaction.atomic():
+            fresh_actor, document = _locked_authorized_document(
+                actor=actor, capability=DocumentCapability.PROCESS, document_id=document_id,
+            )
+            if document.metadata_revision != expected_revision or document.visibility != Document.Visibility.ACTIVE:
+                raise DocumentConflictError("Document state does not allow retry")
+            version = DocumentVersion.objects.select_for_update().filter(pk=version_id, document=document).first()
+            if version is None or version.processing_state not in {
+                DocumentVersion.ProcessingState.FAILED, DocumentVersion.ProcessingState.CANCELLED,
+            } or document.candidate_version_id != version.pk:
+                raise DocumentConflictError("Document version is not retryable")
+            if ProcessingJob.objects.select_for_update().filter(document_version=version, nonterminal_slot=True).exists():
+                raise DocumentConflictError("Document version already has active work")
+            job = ProcessingJob.objects.create(document_version=version, available_at=timezone.now())
+            version.processing_state = DocumentVersion.ProcessingState.QUEUED
+            version.save(update_fields=("processing_state", "updated_at"))
+            record_critical_event(
+                action=SecurityAuditEvent.Action.DOCUMENT_RETRY_REQUESTED, actor_user_id=fresh_actor.pk,
+                target_type=SecurityAuditEvent.TargetType.IT_DOCUMENT, target_id=str(document.pk),
+                outcome=SecurityAuditEvent.Outcome.SUCCESS,
+            )
+            return job
+    except _DocumentUnavailable:
+        _raise_unavailable(actor)
