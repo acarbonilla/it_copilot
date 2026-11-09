@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 from documents.models import Document, DocumentVersion
@@ -124,3 +125,65 @@ class RetrievalIndexJob(models.Model):
             ),
         ]
         indexes = [models.Index(fields=("state", "available_at"), name="copilot_index_claim_idx")]
+
+
+class CopilotConversation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="copilot_conversations",
+    )
+    title = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_activity_at = models.DateTimeField()
+    retention_expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ("-last_activity_at", "-id")
+        indexes = [
+            models.Index(fields=("owner", "last_activity_at"), name="copilot_convo_owner_idx"),
+            models.Index(fields=("retention_expires_at", "id"), name="copilot_convo_expiry_idx"),
+        ]
+
+
+class CopilotMessage(models.Model):
+    class Role(models.TextChoices):
+        USER = "USER", "User"
+        ASSISTANT = "ASSISTANT", "Assistant"
+
+    class GroundingStatus(models.TextChoices):
+        NOT_APPLICABLE = "NOT_APPLICABLE", "Not applicable"
+        REFERENCES = "REFERENCES", "Authorized references"
+        INSUFFICIENT = "INSUFFICIENT", "Insufficient evidence"
+
+    class ProviderStatus(models.TextChoices):
+        NOT_APPLICABLE = "NOT_APPLICABLE", "Not applicable"
+        DISABLED = "DISABLED", "Disabled"
+        SUCCEEDED = "SUCCEEDED", "Succeeded"
+        FAILED = "FAILED", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(CopilotConversation, on_delete=models.CASCADE, related_name="messages")
+    role = models.CharField(max_length=16, choices=Role.choices)
+    content = models.TextField(blank=True)
+    grounding_status = models.CharField(
+        max_length=24, choices=GroundingStatus.choices, default=GroundingStatus.NOT_APPLICABLE,
+    )
+    provider_status = models.CharField(
+        max_length=24, choices=ProviderStatus.choices, default=ProviderStatus.NOT_APPLICABLE,
+    )
+    citations = models.JSONField(default=list, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        indexes = [models.Index(fields=("conversation", "created_at"), name="copilot_message_history_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(role="USER", grounding_status="NOT_APPLICABLE", provider_status="NOT_APPLICABLE")
+                    | models.Q(role="ASSISTANT")
+                ),
+                name="copilot_message_user_statuses",
+            ),
+        ]

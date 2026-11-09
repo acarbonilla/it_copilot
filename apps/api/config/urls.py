@@ -6,6 +6,7 @@ from health.views import HealthView
 from documents.views import (DocumentArchiveView, DocumentCollectionView, DocumentDeleteView, DocumentDetailView,
                              DocumentDownloadView, DocumentRestoreView, DocumentRetryView, DocumentStatusView)
 from session_auth.views import CsrfView, LoginView, LogoutView, MeView
+from copilot.views import ConversationCollectionView, ConversationDetailView, ConversationMessageView
 
 urlpatterns = [
     path("api/v1/health", HealthView.as_view(), name="health"),
@@ -28,5 +29,8 @@ urlpatterns = [
     path("api/v1/documents/<uuid:document_id>/restore", DocumentRestoreView.as_view(), name="document-restore"),
     path("api/v1/documents/<uuid:document_id>/delete", DocumentDeleteView.as_view(), name="document-delete"),
     path("api/v1/documents/<uuid:document_id>/retry", DocumentRetryView.as_view(), name="document-retry"),
+    path("api/v1/copilot/conversations", ConversationCollectionView.as_view(), name="copilot-conversation-list"),
+    path("api/v1/copilot/conversations/<uuid:conversation_id>", ConversationDetailView.as_view(), name="copilot-conversation-detail"),
+    path("api/v1/copilot/conversations/<uuid:conversation_id>/messages", ConversationMessageView.as_view(), name="copilot-conversation-messages"),
 ]
 handler404 = "config.errors.structured_not_found"
