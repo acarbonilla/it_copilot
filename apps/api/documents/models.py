@@ -210,3 +210,17 @@ class QuarantinedArtifact(models.Model):
 
     storage_key = models.CharField(max_length=255, primary_key=True, editable=False)
     quarantined_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+
+class DocumentRetrievalChange(models.Model):
+    """Content-free transactional outbox consumed by the F-04 index worker."""
+
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name="retrieval_changes")
+    document_version_id = models.UUIDField(null=True, blank=True, editable=False)
+    reason = models.CharField(max_length=32, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    consumed_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    class Meta:
+        ordering = ("id",)
+        indexes = [models.Index(fields=("consumed_at", "id"), name="document_retrieval_outbox_idx")]
