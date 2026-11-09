@@ -78,7 +78,7 @@ No browser end-to-end run or screenshot is claimed. Component tests use jsdom. N
 | AC-10 | Confirmed deletion and generic expired/deleted recovery | PASS |
 | AC-11 | Existing credential/CSRF/session conventions; backend regressions pass | PASS |
 | AC-12 | Semantic controls, keyboard flow, announcements, responsive classes | PASS (component evidence) |
-| AC-13 | 43 frontend and 101 backend tests run; build/type/lint pass | PASS |
+| AC-13 | 50 frontend and 101 backend tests run; build/type/lint pass | PASS |
 | AC-14 | This record and feature record updated | PASS |
 | AC-15 | No provider, cloud, queue, vector, migration, or backend source change | PASS |
 
@@ -89,3 +89,31 @@ Provider synthesis remains intentionally disabled, so the UI provides references
 ## Review boundary
 
 This record requests SOL G2 verification of IC-020 and consolidated F-04 acceptance. It does not authorize provider activation, private-data transmission, a merge, or deployment.
+
+## SOL G2 focused corrections
+
+### G2-F01 — stale asynchronous UI updates
+
+The workspace now maintains independent monotonically increasing generations for conversation detail selection, conversation-list refresh, and message submission, together with an immediate active-conversation identity and mounted-state guard. A new selection invalidates prior selection and submission UI effects before its detail request begins. Only the latest matching request may update the selected conversation, messages, loading state, notice, or submission state. Unmounting closes every state-publication path.
+
+List requests publish only when their generation remains current. Both obsolete successes and obsolete failures are ignored, so an older refresh cannot restore an outdated sidebar or overwrite a newer success with an error. Switching conversations preserves the typed draft while invalidating the previous conversation's pending submission effects. A late committed response therefore cannot replace the active conversation or clear its draft.
+
+Deterministic deferred-promise tests resolve detail requests out of order, reject a stale detail request after a newer success, complete a submission after navigation, reject an obsolete list refresh after a newer refresh, and resolve a request after unmount.
+
+### G2-F02 — submission-failure classification
+
+Primary submission and secondary list refresh are now separate operations. After `submitCopilotQuestion()` returns successfully, the turn is rendered and the input is cleared; a later list failure reports that the message was saved but the sidebar refresh failed. It does not enter uncertain-submission recovery.
+
+Only the API client's transport classification (`ApiError` status `0`) triggers uncertain-outcome detail refresh. Successful detail refresh preserves the draft and asks the user to inspect refreshed history before retrying. A failed detail refresh reports that status could not be confirmed. Explicit API rejections are definite failures: their server error is displayed and the draft is preserved without a detail refresh. Generic 404 responses clear the unavailable conversation and refresh the safe owned list.
+
+### Correction verification
+
+Commands were run from `apps/web` against the corrected implementation:
+
+- `npx vitest run components/copilot-workspace.test.tsx lib/api.test.ts components/dashboard-shell.test.tsx` — 26 passed across 3 files.
+- `npm test` — 50 passed across 9 files.
+- `npm run typecheck` — passed.
+- `npm run lint` — passed with zero warnings.
+- `npm run build` — passed; `/copilot` generated successfully.
+
+The correction changes only the Copilot workspace component, its frontend tests, and this living record. Backend code, provider behavior, migrations, infrastructure, and unrelated features remain unchanged.
