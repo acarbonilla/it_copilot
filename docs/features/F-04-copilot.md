@@ -1,13 +1,13 @@
 # F-04 — Copilot
 
-**Status:** IC-018 and IC-019 merged; IC-020 locally implemented and pending SOL G2 review
-**Feature branch:** `feature/f04-copilot-ui`
+**Status:** IC-018, IC-019, and IC-020 merged; post-merge verification complete and pending SOL closure review
+**Closure branch:** `docs/f04-post-merge-closure`
 **Ratified task range:** IC-018–IC-020
 **Dependency baseline:** F-01, F-02, and F-03 accepted on `main`
 
 ## Purpose
 
-F-04 is the ratified MVP capability for authenticated Copilot retrieval and separately gated OpenAI integration. IC-018 provides the merged local retrieval foundation. IC-019 adds owner-private conversations, reference-only grounded fallback, citation validation, retention, and a disabled provider interface. IC-020 remains separately authorized.
+F-04 is the ratified MVP capability for authenticated Copilot retrieval with separately gated provider integration. IC-018 provides the merged local retrieval foundation. IC-019 adds owner-private conversations, reference-only grounded fallback, citation validation, retention, and a disabled provider interface. IC-020 provides the merged authenticated, responsive Copilot workspace and its integrated frontend security behavior.
 
 The authoritative contract is [F-04 Consolidated G1 Requirements Contract](F-04-consolidated-g1-proposal.md). It preserves IC-031 discovery history and records PO ratification of D1–D14 plus clarifications C1–C4. IC-019 adds local conversation endpoints but no credential, provider network call, or private-data transfer.
 
@@ -38,7 +38,7 @@ The authoritative contract is [F-04 Consolidated G1 Requirements Contract](F-04-
 | IC-019 | Grounded Conversation and Provider Boundary | Provider/privacy/cost ratification and grounded API G2 |
 | IC-020 | Copilot UI, Integrated Security, and F-04 Acceptance | Browser/integration/security G2 and feature finalization |
 
-These titles, scopes, dependencies, criteria, and G2 boundaries are ratified. IC-018 and IC-019 are merged. IC-020 has received local implementation authorization and is pending SOL G2 review.
+These titles, scopes, dependencies, criteria, and G2 boundaries are ratified. IC-018, IC-019, and IC-020 are merged on `main`. Their implementation decisions and historical test evidence remain recorded in their task documents and PRs.
 
 ## Recommended architecture
 
@@ -58,6 +58,19 @@ F-03 remains limited to local Windows/NTFS and native MySQL, report-only purge, 
 
 No web search, autonomous agents, tool execution, credential-vault access, hosted vector store, external search service, attachment/multimodal interface, deployment work, AWS, Redis, Celery, or F-05 behavior is authorized.
 
-## Current review request
+## Accepted MVP limitations
 
-SOL should verify the IC-020 authenticated workspace, responsive conversation navigation, server-authoritative lifecycle, question validation, reference-only and insufficient-evidence presentation, metadata-only citations, expiry recovery, CSRF client behavior, accessibility, and regression evidence. The provider remains disabled and no external data transfer has been added. Recommended disposition: **IC-020 READY FOR SOL G2 REVIEW**; this is not a G2 acceptance declaration.
+- AI-generated synthesis remains disabled; references are returned without generated answer text.
+- Citations remain non-clickable pending an approved document-resolution interface.
+- The workspace displays the first bounded conversation page of 25 records.
+- No real-browser accessibility audit has been completed; component-level accessibility evidence is retained.
+- The current lockfile installation reports eight moderate npm audit findings; no automatic upgrade or audit fix has been authorized.
+- Native MySQL post-merge rerun remains unavailable without legitimate local credentials. Accepted IC-018 and IC-019 native evidence remains historical dependency evidence and is not represented as a new run.
+
+## Closure record
+
+Post-merge commands, security evidence, limitations, and the final acceptance matrix are recorded in [F-04 Post-Merge Verification and Closure](../02-Development/F-04-post-merge-verification-and-closure.md).
+
+The provider and private-document-transfer gates remain disabled. Provider activation, deployment, dependency remediation, broader pagination, citation resolution, and other enhancements require separate authorization.
+
+Recommended disposition: **F-04 post-merge verification complete; ready for SOL closure review**. This documentation does not itself declare PO acceptance or authorize deployment.
