@@ -1,7 +1,7 @@
 # F-04 — Copilot
 
-**Status:** IC-018 merged; IC-019 locally implemented and pending SOL G2 review
-**Feature branch:** `feature/f04-grounded-conversation`
+**Status:** IC-018 and IC-019 merged; IC-020 locally implemented and pending SOL G2 review
+**Feature branch:** `feature/f04-copilot-ui`
 **Ratified task range:** IC-018–IC-020
 **Dependency baseline:** F-01, F-02, and F-03 accepted on `main`
 
@@ -38,7 +38,7 @@ The authoritative contract is [F-04 Consolidated G1 Requirements Contract](F-04-
 | IC-019 | Grounded Conversation and Provider Boundary | Provider/privacy/cost ratification and grounded API G2 |
 | IC-020 | Copilot UI, Integrated Security, and F-04 Acceptance | Browser/integration/security G2 and feature finalization |
 
-These titles, scopes, dependencies, criteria, and G2 boundaries are ratified. IC-018 is merged and IC-019 received local implementation authorization. IC-020 remains unauthorized.
+These titles, scopes, dependencies, criteria, and G2 boundaries are ratified. IC-018 and IC-019 are merged. IC-020 has received local implementation authorization and is pending SOL G2 review.
 
 ## Recommended architecture
 
@@ -60,4 +60,4 @@ No web search, autonomous agents, tool execution, credential-vault access, hoste
 
 ## Current review request
 
-SOL should verify IC-019 owner isolation, atomic turns, guarded IC-018 retrieval integration, reference-only fallback, citation integrity, provider no-network behavior, retention cleanup, and concurrency evidence. Recommended disposition: **IC-019 READY FOR SOL G2 REVIEW**; this is not a G2 acceptance declaration.
+SOL should verify the IC-020 authenticated workspace, responsive conversation navigation, server-authoritative lifecycle, question validation, reference-only and insufficient-evidence presentation, metadata-only citations, expiry recovery, CSRF client behavior, accessibility, and regression evidence. The provider remains disabled and no external data transfer has been added. Recommended disposition: **IC-020 READY FOR SOL G2 REVIEW**; this is not a G2 acceptance declaration.

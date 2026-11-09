@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { activateAccount, bootstrapCsrf, login, logout, resetApiStateForTests } from "./api";
+import { activateAccount, bootstrapCsrf, createCopilotConversation, deleteCopilotConversation, login, logout, resetApiStateForTests, submitCopilotQuestion } from "./api";
 
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -100,6 +100,21 @@ describe("session API client", () => {
         headers: expect.objectContaining({ "X-CSRFToken": "token" }),
         body: JSON.stringify({ token: "activation-secret", password: "correct horse battery staple" }),
       }),
+    ]);
+  });
+
+  it("uses CSRF protection for Copilot mutations", async () => {
+    const conversation = { id: "conversation" };
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ csrfToken: "token" }))
+      .mockResolvedValueOnce(json({ conversation }, 201))
+      .mockResolvedValueOnce(json({ conversation, user_message: {}, assistant_message: {} }, 201))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await createCopilotConversation(); await submitCopilotQuestion("conversation", "question"); await deleteCopilotConversation("conversation");
+    expect(fetchMock.mock.calls.slice(1).map(call => call[1])).toEqual([
+      expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "X-CSRFToken": "token" }) }),
+      expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "X-CSRFToken": "token" }) }),
+      expect.objectContaining({ method: "DELETE", headers: expect.objectContaining({ "X-CSRFToken": "token" }) }),
     ]);
   });
 });

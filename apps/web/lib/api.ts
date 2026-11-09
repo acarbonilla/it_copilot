@@ -100,4 +100,16 @@ export async function documentAction(item: DocumentItem, action: "archive" | "re
 export async function retryDocument(item: DocumentItem): Promise<void> { if (!item.processing) throw new ApiError(409, "conflict", "Document has no retryable version"); await unsafeRequest(`/api/v1/documents/${item.id}/retry`, { expected_revision: item.metadata_revision, version_id: item.processing.version_id }); }
 export function documentDownloadUrl(id: string): string { return `${API_BASE_URL}/api/v1/documents/${id}/download`; }
 
+export type CopilotCitation = { id: string; document_id: string; version_id: string; label: string; version_sequence: number };
+export type CopilotMessage = { id: string; role: "user" | "assistant"; content: string; grounding_status: "not_applicable" | "references" | "insufficient"; provider_status: "not_applicable" | "disabled" | "unavailable"; citations: CopilotCitation[]; created_at: string };
+export type CopilotConversation = { id: string; title: string; created_at: string; updated_at: string; last_activity_at: string; retention_expires_at: string };
+export type CopilotConversationPage = { conversations: CopilotConversation[]; pagination: { page: number; page_size: number; count: number; total_pages: number } };
+export type CopilotConversationDetail = { conversation: CopilotConversation; messages: CopilotMessage[] };
+
+export async function listCopilotConversations(page = 1): Promise<CopilotConversationPage> { return request(`/api/v1/copilot/conversations?page=${page}&page_size=25`); }
+export async function getCopilotConversation(id: string): Promise<CopilotConversationDetail> { return request(`/api/v1/copilot/conversations/${encodeURIComponent(id)}`); }
+export async function createCopilotConversation(title = "New conversation"): Promise<CopilotConversation> { return (await unsafeRequest<{ conversation: CopilotConversation }>("/api/v1/copilot/conversations", { title })).conversation; }
+export async function deleteCopilotConversation(id: string): Promise<void> { await unsafeRequest(`/api/v1/copilot/conversations/${encodeURIComponent(id)}`, undefined, "DELETE"); }
+export async function submitCopilotQuestion(id: string, question: string): Promise<{ conversation: CopilotConversation; user_message: CopilotMessage; assistant_message: CopilotMessage }> { return unsafeRequest(`/api/v1/copilot/conversations/${encodeURIComponent(id)}/messages`, { question }); }
+
 export function resetApiStateForTests() { csrfToken = null; }
