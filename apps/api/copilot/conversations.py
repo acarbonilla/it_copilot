@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from accounts.models import User
@@ -56,23 +56,29 @@ def create_conversation(*, actor, title="New conversation", now=None):
         )
 
 
-def owned_conversations(*, actor):
+def owned_conversations(*, actor, now=None):
     fresh = _eligible_actor(actor)
-    return CopilotConversation.objects.filter(owner=fresh)
+    now = now or timezone.now()
+    return CopilotConversation.objects.filter(owner=fresh, retention_expires_at__gt=now)
 
 
-def owned_conversation(*, actor, conversation_id, lock=False):
+def owned_conversation(*, actor, conversation_id, lock=False, now=None):
     fresh = _eligible_actor(actor, lock=lock)
+    now = now or timezone.now()
     queryset = CopilotConversation.objects.select_for_update() if lock else CopilotConversation.objects
-    conversation = queryset.filter(pk=conversation_id, owner=fresh).first()
+    conversation = queryset.filter(
+        pk=conversation_id, owner=fresh, retention_expires_at__gt=now,
+    ).first()
     if conversation is None:
         raise ConversationUnavailable
     return conversation
 
 
-def delete_conversation(*, actor, conversation_id):
+def delete_conversation(*, actor, conversation_id, now=None):
     with transaction.atomic():
-        conversation = owned_conversation(actor=actor, conversation_id=conversation_id, lock=True)
+        conversation = owned_conversation(
+            actor=actor, conversation_id=conversation_id, lock=True, now=now,
+        )
         conversation.delete()
 
 
@@ -82,7 +88,7 @@ def submit_question(*, actor, conversation_id, question, provider=None, store=No
     with transaction.atomic():
         fresh = _eligible_actor(actor, lock=True)
         conversation = CopilotConversation.objects.select_for_update().filter(
-            pk=conversation_id, owner=fresh,
+            pk=conversation_id, owner=fresh, retention_expires_at__gt=now,
         ).first()
         if conversation is None:
             raise ConversationUnavailable
@@ -123,6 +129,27 @@ def purge_expired_conversations(*, limit=100, execute=False, now=None):
     now = now or timezone.now()
     ids = tuple(CopilotConversation.objects.filter(retention_expires_at__lte=now).order_by("retention_expires_at", "id").values_list("id", flat=True)[:limit])
     if execute and ids:
-        with transaction.atomic():
-            CopilotConversation.objects.select_for_update().filter(pk__in=ids).delete()
+        return _delete_expired_ids(candidate_ids=ids, now=now)
     return ids
+
+
+def _delete_expired_ids(*, candidate_ids, now):
+    """Lock and revalidate stale cleanup candidates immediately before deletion."""
+    candidate_ids = tuple(candidate_ids)
+    if not candidate_ids:
+        return ()
+    deleted = []
+    with transaction.atomic():
+        queryset = CopilotConversation.objects.filter(pk__in=candidate_ids).order_by(
+            "retention_expires_at", "id",
+        )
+        if connection.features.has_select_for_update_skip_locked:
+            queryset = queryset.select_for_update(skip_locked=True)
+        else:
+            queryset = queryset.select_for_update()
+        for conversation in queryset:
+            if conversation.retention_expires_at <= now:
+                conversation_id = conversation.pk
+                conversation.delete()
+                deleted.append(conversation_id)
+    return tuple(deleted)

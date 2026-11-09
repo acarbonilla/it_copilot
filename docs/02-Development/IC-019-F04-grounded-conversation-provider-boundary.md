@@ -51,7 +51,7 @@ Activity extends expiry by 30 days. `purge_copilot_conversations` reports at mos
 | AC-08–09 | Fresh identity checks and bounded API/history/retrieval | Implemented/tested |
 | AC-10 | Rolling expiry and bounded dry-run-first cleanup | Implemented/tested |
 | AC-11 | Native concurrent-turn serialization | Implemented/tested |
-| AC-12 | 239 relevant regressions passed; 45 native-only skips under SQLite | Passed |
+| AC-12 | 242 relevant tests run; 46 skipped and 196 passed under SQLite | Passed |
 | AC-13–14 | This record; no frontend/external infrastructure | Implemented |
 
 ## Known limitations
@@ -67,6 +67,27 @@ SOL should verify the exact local implementation, native concurrency, API securi
 - Focused IC-019 SQLite service/API tests: 11 passed.
 - Complete Copilot SQLite suite: 24 passed, 15 native-only skipped (39 discovered).
 - Native MySQL IC-019 concurrency plus IC-018 retrieval regressions: 15 passed.
-- Relevant `accounts.tests`, `documents.tests`, and `copilot.tests`: 239 passed, 45 skipped under SQLite settings.
+- Relevant `accounts.tests`, `documents.tests`, and `copilot.tests`: 242 run, 46 skipped, 196 passed under SQLite settings.
 - `makemigrations --check --dry-run`: no changes detected.
 - Django system check: no issues.
+
+## G2 focused corrections
+
+### G2-F01 — retention cleanup race
+
+The initial cleanup selected expired IDs and then bulk-deleted them, allowing a conversation renewed after selection to be deleted from stale eligibility. Cleanup now preserves its bounded dry-run selection but, in execute mode, locks each candidate under one transaction, reloads its current expiry, and deletes it only when `retention_expires_at <= now` still holds. MySQL uses `select_for_update(skip_locked=True)` where supported, so cleanup avoids waiting on actively renewed rows. The command reports the number actually deleted rather than the stale candidate count.
+
+A deterministic native MySQL regression selects an expired candidate, renews it from a concurrent connection, and then lets cleanup lock and revalidate the stale candidate. The renewed row remains and the deletion result is empty.
+
+### G2-F02 — expired conversation access
+
+Normal list, detail, message submission, and user deletion now require `retention_expires_at > now`. The exact boundary is therefore expired: a conversation with `retention_expires_at == now` is hidden and generically unavailable and cannot be renewed by submitting a turn. Owner isolation remains unchanged. Cleanup uses its separate internal locked path and can legitimately delete boundary-expired records.
+
+Focused service/API tests cover list exclusion, detail/message/delete denial, exact-boundary behavior, non-renewal, and subsequent authorized cleanup deletion.
+
+### Correction verification
+
+- Focused IC-019 correction suite: 13 passed.
+- Native MySQL conversation/retrieval suite: 16 passed, including stale cleanup selection versus renewal.
+- Relevant regression suite: 242 run, 46 skipped, 196 passed.
+- Migration consistency and Django system checks: passed.

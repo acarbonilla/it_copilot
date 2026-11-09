@@ -10,8 +10,8 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from copilot.citations import InvalidCitation, released_citations, validate_citation_ids
 from copilot.conversations import (
-    ConversationLimitReached, ConversationUnavailable, create_conversation,
-    purge_expired_conversations, submit_question,
+    ConversationLimitReached, ConversationUnavailable, create_conversation, delete_conversation,
+    owned_conversation, owned_conversations, purge_expired_conversations, submit_question,
 )
 from copilot.models import CopilotConversation, CopilotMessage
 from copilot.provider import DisabledByDefaultProviderAdapter, ProviderUnavailable
@@ -94,6 +94,21 @@ class ConversationServiceTests(TestCase):
         purge_expired_conversations(limit=1, execute=True)
         self.assertFalse(CopilotConversation.objects.filter(pk=self.conversation.pk).exists())
 
+    def test_expired_conversation_is_unavailable_for_all_normal_operations(self):
+        boundary = timezone.now()
+        CopilotConversation.objects.filter(pk=self.conversation.pk).update(retention_expires_at=boundary)
+        self.assertFalse(owned_conversations(actor=self.owner, now=boundary).exists())
+        with self.assertRaises(ConversationUnavailable):
+            owned_conversation(actor=self.owner, conversation_id=self.conversation.pk, now=boundary)
+        with self.assertRaises(ConversationUnavailable):
+            submit_question(actor=self.owner, conversation_id=self.conversation.pk,
+                            question="cannot renew", now=boundary)
+        with self.assertRaises(ConversationUnavailable):
+            delete_conversation(actor=self.owner, conversation_id=self.conversation.pk, now=boundary)
+        self.conversation.refresh_from_db()
+        self.assertEqual(self.conversation.retention_expires_at, boundary)
+        self.assertEqual(purge_expired_conversations(limit=1, execute=True, now=boundary), (self.conversation.pk,))
+
     def test_citations_are_stable_bounded_metadata_and_tamper_rejected(self):
         available = released_citations(evidence_result().evidence)
         self.assertEqual(available, released_citations(evidence_result().evidence))
@@ -150,3 +165,17 @@ class ConversationApiTests(TestCase):
             {"question": "x" * 2001}, format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_expired_conversation_is_hidden_and_generically_unavailable(self):
+        conversation = create_conversation(actor=self.owner)
+        CopilotConversation.objects.filter(pk=conversation.pk).update(
+            retention_expires_at=timezone.now() - timedelta(seconds=1),
+        )
+        self.client.force_login(self.owner)
+        listed = self.client.get("/api/v1/copilot/conversations")
+        self.assertEqual(listed.json()["pagination"]["count"], 0)
+        url = f"/api/v1/copilot/conversations/{conversation.pk}"
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.delete(url).status_code, 404)
+        self.assertEqual(self.client.post(f"{url}/messages", {"question": "renew"}, format="json").status_code, 404)
+        self.assertTrue(CopilotConversation.objects.filter(pk=conversation.pk).exists())
