@@ -1,15 +1,15 @@
 # F-04 — Copilot
 
-**Status:** G1 requirements ratified; IC-018 locally implemented and pending SOL G2 review
-**Feature branch:** `feature/copilot` when separately authorized
+**Status:** IC-018 merged; IC-019 locally implemented and pending SOL G2 review
+**Feature branch:** `feature/f04-grounded-conversation`
 **Ratified task range:** IC-018–IC-020
 **Dependency baseline:** F-01, F-02, and F-03 accepted on `main`
 
 ## Purpose
 
-F-04 is the ratified MVP capability for authenticated Copilot retrieval and separately gated OpenAI integration. IC-018 implements the local retrieval foundation; detailed IC-019 and IC-020 execution remains subject to separate authorization.
+F-04 is the ratified MVP capability for authenticated Copilot retrieval and separately gated OpenAI integration. IC-018 provides the merged local retrieval foundation. IC-019 adds owner-private conversations, reference-only grounded fallback, citation validation, retention, and a disabled provider interface. IC-020 remains separately authorized.
 
-The authoritative contract is [F-04 Consolidated G1 Requirements Contract](F-04-consolidated-g1-proposal.md). It preserves IC-031 discovery history and records PO ratification of D1–D14 plus clarifications C1–C4. IC-018 adds local schema and internal retrieval services only; no conversation endpoint, credential, provider call, or private-data transfer has been implemented or authorized.
+The authoritative contract is [F-04 Consolidated G1 Requirements Contract](F-04-consolidated-g1-proposal.md). It preserves IC-031 discovery history and records PO ratification of D1–D14 plus clarifications C1–C4. IC-019 adds local conversation endpoints but no credential, provider network call, or private-data transfer.
 
 ## Existing boundaries inherited by F-04
 
@@ -38,7 +38,7 @@ The authoritative contract is [F-04 Consolidated G1 Requirements Contract](F-04-
 | IC-019 | Grounded Conversation and Provider Boundary | Provider/privacy/cost ratification and grounded API G2 |
 | IC-020 | Copilot UI, Integrated Security, and F-04 Acceptance | Browser/integration/security G2 and feature finalization |
 
-These titles, scopes, dependencies, criteria, and G2 boundaries are ratified. IC-018 received separate local implementation authorization; IC-019 and IC-020 remain unauthorized.
+These titles, scopes, dependencies, criteria, and G2 boundaries are ratified. IC-018 is merged and IC-019 received local implementation authorization. IC-020 remains unauthorized.
 
 ## Recommended architecture
 
@@ -60,4 +60,4 @@ No web search, autonomous agents, tool execution, credential-vault access, hoste
 
 ## Current review request
 
-SOL should verify the IC-018 implementation and evidence against the ratified contract, including its F-03 boundary, native MySQL behavior, concurrency, and immediate invalidation controls. Recommended disposition: **IC-018 READY FOR SOL G2 REVIEW**; this is not a G2 acceptance declaration.
+SOL should verify IC-019 owner isolation, atomic turns, guarded IC-018 retrieval integration, reference-only fallback, citation integrity, provider no-network behavior, retention cleanup, and concurrency evidence. Recommended disposition: **IC-019 READY FOR SOL G2 REVIEW**; this is not a G2 acceptance declaration.
