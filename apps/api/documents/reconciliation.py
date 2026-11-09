@@ -107,6 +107,8 @@ def execute_recovery_issue(*, actor, issue, store=None, now=None):
                 document.current_version = None
                 document.save(update_fields=("current_version", "updated_at"))
             _audit(fresh, SecurityAuditEvent.TargetType.IT_DOCUMENT, str(document.pk))
+            from .retrieval import queue_retrieval_change
+            queue_retrieval_change(document=document, version=version, reason="artifact_invalid")
             return "reconciled"
     finally:
         store.close()

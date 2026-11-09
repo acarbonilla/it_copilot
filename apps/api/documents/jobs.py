@@ -288,6 +288,8 @@ def publish_claim(claim, *, stored, character_count, page_count, extractor_versi
             target_id=str(document.pk),
             outcome=SecurityAuditEvent.Outcome.SUCCESS,
         )
+        from .retrieval import queue_retrieval_change
+        queue_retrieval_change(document=document, version=version, reason="ready_published")
         return artifact
 
 

@@ -173,6 +173,10 @@ def _transition(*, actor, document_id, expected_revision, from_states, to_state,
                 target_id=str(document.pk),
                 outcome=SecurityAuditEvent.Outcome.SUCCESS,
             )
+            from .retrieval import queue_retrieval_change
+            queue_retrieval_change(
+                document=document, version=document.current_version_id, reason=to_state.lower(),
+            )
             return LifecycleResult(document=document, previous_visibility=previous)
     except _DocumentUnavailable:
         _raise_unavailable(actor)
