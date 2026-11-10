@@ -1,6 +1,6 @@
-# F-05 G1 — Consolidated Requirements and Security Architecture Proposal
+# F-05 G1 — Consolidated Requirements and Security Architecture Contract
 
-**Status:** G1 proposal; not ratified and not implementation authorization
+**Status:** **PRODUCT OWNER RATIFIED — F-05 G1 COMPLETE**
 
 **Feature:** F-05 — Personal Credential Vault
 
@@ -14,7 +14,15 @@
 
 **Verified baseline:** `origin/main` at `d3ced0921601cef762f9ec5cdf6d98755fe4c5c6` on 2026-11-10
 
-This document proposes the F-05 contract. Words such as **must** in proposed sections describe the contract that would become mandatory only after Product Owner ratification. All F05-D01–D15 entries remain **open PO decisions**; their recommended defaults are not approved requirements. Nothing here authorizes implementation, migrations, dependencies, feature/task branches, a merge, deployment, provider activation, or IC-024.
+**Exact SOL-reviewed PR head:** `4b9276691f8b8135534d87ed2905f0456f81d351`
+
+**SOL G1 review:** PASS on 2026-11-10
+
+**Product Owner ratification:** 2026-11-10; consolidated contract and F05-D01–D15 accepted
+
+**Implementation gate:** IC-021, IC-022, and IC-023 require separate explicit implementation authorization
+
+The Product Owner explicitly accepted SOL's PASS recommendation at exact reviewed head `4b9276691f8b8135534d87ed2905f0456f81d351` and ratified this consolidated F-05 contract together with F05-D01–D15. Requirements expressed as **must** are therefore the G1 requirements baseline. Ratification does not authorize implementation, migrations, dependencies, implementation branches, PR merge, deployment, provider activation, or IC-024. IC-021–IC-023 remain blocked pending separate explicit implementation authorization and their later TTDM gates.
 
 ## 1. Authority and source inventory
 
@@ -23,7 +31,7 @@ This document proposes the F-05 contract. Words such as **must** in proposed sec
 1. Product Owner decisions and merged closeout evidence are authoritative.
 2. Ratified task/feature specifications remain authoritative within their scope.
 3. Historical proposals remain evidence of their then-current gate; later accepted records supersede their status, not their history.
-4. This document makes new recommendations where the repository has no approved F-05 contract. Each security-sensitive choice is identified as a Product Owner decision rather than silently selected.
+4. The recommendations recorded at the SOL-reviewed head became approved F-05 decisions only through the Product Owner's 2026-11-10 ratification. Their discovery origin and approved disposition remain traceable in Section 4.
 
 ### 1.2 Inspected baseline
 
@@ -38,11 +46,11 @@ This document proposes the F-05 contract. Words such as **must** in proposed sec
 | F-04 consolidated contract and PR #26 closure record | Accepted owner-private conversations, request-time reauthorization, provider-disabled/private-transfer gates, and isolation from private storage. No Copilot-to-vault access exists. |
 | `docs/architecture/overview.md`, `docs/architecture/data-model.md`, audit model/service | Current Django/DRF/MySQL boundaries and secret-free, allowlisted audit schema. No F-05 model, API, key service, or encryption dependency exists. |
 
-No repository record was found for IC-021, IC-022, IC-023, or IC-024 beyond planning references and the explicit IC-024 deferral. The only approved vault behavior is the IC-003 policy invariant: an active authenticated owner may access their own vault; App Admin, framework flags, and IT roles grant no cross-owner vault access. Everything else below is proposed.
+Before this ratification, no repository record existed for IC-021, IC-022, IC-023, or IC-024 beyond planning references and the explicit IC-024 deferral. The inherited IC-003 policy invariant remains authoritative: an active authenticated owner may access their own vault; App Admin, framework flags, and IT roles grant no cross-owner vault access. The additional requirements below are now the ratified F-05 G1 baseline, not implementation authorization.
 
 ## 2. Existing approved requirements
 
-The following are inherited, not reopened by this proposal:
+The following are inherited and were not reopened by F-05 ratification:
 
 - Vault data is owner-private. No App Admin, `IT_DOC_ADMIN`, `IT_EDITOR`, `IT_MEMBER`, staff, or superuser flag grants another user's access.
 - Unknown, anonymous, inactive, deactivated, and cross-owner subjects are denied by default. Authorization must be enforced server-side on every request; browser state is not authority.
@@ -53,13 +61,13 @@ The following are inherited, not reopened by this proposal:
 - Provider activation and private-data transfer remain disabled. F-04 must not read vault tables, encryption keys, decrypted values, or vault APIs.
 - IC-024 is not authorized. A deletion-review record is not permission to delete an account or vault.
 
-## 3. Proposed F-05 product requirements
+## 3. Ratified F-05 product requirements
 
 ### 3.1 Product boundary and record types
 
 F-05 is an owner-private personal vault for credentials needed by that owner. It is not an enterprise password manager, shared-secret store, provider credential broker, document attachment store, browser extension, autofill system, or administrator recovery console.
 
-Proposed record types and fields:
+Ratified record types and fields:
 
 | Type | Nonsecret fields | Encrypted fields |
 | --- | --- | --- |
@@ -70,12 +78,12 @@ Proposed record types and fields:
 
 The server must not derive or persist a public fingerprint from a secret unless a later approved use case requires it. Public key material for `SSH_KEY` is excluded from the initial record unless the PO explicitly approves storage and derivation behavior.
 
-Proposed limits: label 120 characters; service label 120; origin 2,048; account identifier 320; primary secret 32 KiB UTF-8; notes 8 KiB; private key 64 KiB; list default 25 and maximum 100; at most 1,000 active/deleted records per owner. Values are text in V1; binary secrets and attachments are excluded.
+Ratified limits: label 120 characters; service label 120; origin 2,048; account identifier 320; primary secret 32 KiB UTF-8; notes 8 KiB; private key 64 KiB; list default 25 and maximum 100; at most 1,000 active/deleted records per owner. Values are text in V1; binary secrets and attachments are excluded.
 
 ### 3.2 Encryption envelope
 
 - Every secret-bearing record must use authenticated encryption. Encryption must provide confidentiality and integrity; decryption must authenticate before returning plaintext.
-- Proposed algorithm: AES-256-GCM with a fresh cryptographically random 96-bit nonce for every encryption and a 128-bit tag. Algorithm/version, key version, nonce, ciphertext, and tag are stored separately. Nonce reuse under the same key is forbidden and tested.
+- Ratified algorithm: AES-256-GCM with a fresh cryptographically random 96-bit nonce for every encryption and a 128-bit tag. Algorithm/version, key version, nonce, ciphertext, and tag are stored separately. Nonce reuse under the same key is forbidden and tested.
 - Associated authenticated data (AAD) must bind a versioned context plus immutable record ID, owner ID, record type, and schema version. Moving ciphertext between records, owners, or types must fail authentication.
 - No plaintext credential value may be stored in MySQL, audit, logs, exceptions, caches, analytics, fixtures, snapshots, URLs, or browser persistence.
 - Encryption/decryption exists behind one narrow service. Models, serializers, views, Copilot, document services, templates, and generic debugging tools must not call cryptography primitives or key storage directly.
@@ -83,7 +91,7 @@ Proposed limits: label 120 characters; service label 120; origin 2,048; account 
 
 ### 3.3 Key hierarchy, separation, rotation, and recovery
 
-Recommended local-MVP hierarchy:
+Ratified local-MVP hierarchy:
 
 1. A 256-bit root key-encryption key (KEK) is generated outside MySQL with an OS cryptographic RNG.
 2. A random per-owner data-encryption key (DEK) encrypts credential records. The KEK wraps each DEK with authenticated encryption and owner-bound AAD.
@@ -112,7 +120,7 @@ Key loss is intentionally not bypassable: without an applicable KEK/DEK, credent
 
 Sensitive operations are create, reveal, encrypted-field update, delete, restore, DEK rotation, and any future export. Listing and metadata detail require an active session but no grant.
 
-Proposed flow:
+Ratified flow:
 
 1. `POST /api/v1/vault/reauthenticate` receives the account password over the existing authenticated, CSRF-protected session.
 2. The server reloads the active user, verifies the Django password hash, rotates no session, and creates a server-side sensitive-operation grant. Password input is never logged, audited, stored, or returned.
@@ -120,9 +128,9 @@ Proposed flow:
 4. The server returns a random opaque bearer proof once. The browser holds it only in component memory and sends it in a dedicated header. It must not enter a URL, cookie, HTML serialization, service worker, local/session storage, IndexedDB, cache, telemetry, or console.
 5. The grant expires two minutes after issuance by absolute server time; use does not slide expiry.
 
-Recommended grant semantics are **single-use reservation and consumption**: each grant authorizes at most one committed sensitive operation. “Reservation” means holding the grant row lock inside the transaction; there is no separately committed reserved state. The transaction locks and validates the active user and exact session before the grant, then validates target/business preconditions. Two concurrent requests with the same proof serialize on that row and at most one can commit consumption.
+Ratified grant semantics are **single-use reservation and consumption**: each grant authorizes at most one committed sensitive operation. “Reservation” means holding the grant row lock inside the transaction; there is no separately committed reserved state. The transaction locks and validates the active user and exact session before the grant, then validates target/business preconditions. Two concurrent requests with the same proof serialize on that row and at most one can commit consumption.
 
-Proposed grant failure and delivery table:
+Ratified grant failure and delivery table:
 
 | Outcome | Grant state | Target/audit state | Response and retry contract |
 | --- | --- | --- | --- |
@@ -137,11 +145,11 @@ Serialization plus the grant's single committed transition provides at-most-once
 
 All outstanding grants are revoked on logout, deactivation, password change, explicit `POST /api/v1/vault/grants/revoke`, and server-detected session invalidation. Because ordinary session expiry/deletion can occur without a grant-row update, every use must independently verify the bound session still exists, is unexpired, decodes safely to the same active user, and remains the request's current session. Malformed or undecodable session state fails closed.
 
-Proposed local-MVP reauthentication throttling uses MySQL—no Redis or in-memory-only authority. After session authentication and CSRF, the service follows the global order by locking the user, exact session, per-user throttle row, and per-session-digest throttle row. Five failed password checks in one fixed 15-minute window blocks reauthentication for both scopes until that window ends; malformed or blank password submissions count after authenticated request validation. A successful password check resets both failure counters. At most three unexpired, unconsumed grants may exist for one session, and at most ten grants may be issued per user in a fixed 15-minute window; issuance counters are updated atomically with grant creation. Concurrent attempts serialize on the user throttle row, so they cannot exceed a limit by racing. Wrong password, inactive state, blocked user/session, and issuance-cap denial return the same fixed `reauthentication_failed` body; throttled cases use `429` with a coarse whole-minute `Retry-After`, while other failures use `403`, without email/account input or account-existence differences. Password hashing work must not be skipped in a way that creates a useful timing oracle. Counters contain only user/session digests, window timestamps, and counts; no password, IP address, email, or proof. These are recommended defaults under open decision F05-D08 and require PO approval.
+Ratified local-MVP reauthentication throttling uses MySQL—no Redis or in-memory-only authority. After session authentication and CSRF, the service follows the global order by locking the user, exact session, per-user throttle row, and per-session-digest throttle row. Five failed password checks in one fixed 15-minute window blocks reauthentication for both scopes until that window ends; malformed or blank password submissions count after authenticated request validation. A successful password check resets both failure counters. At most three unexpired, unconsumed grants may exist for one session, and at most ten grants may be issued per user in a fixed 15-minute window; issuance counters are updated atomically with grant creation. Concurrent attempts serialize on the user throttle row, so they cannot exceed a limit by racing. Wrong password, inactive state, blocked user/session, and issuance-cap denial return the same fixed `reauthentication_failed` body; throttled cases use `429` with a coarse whole-minute `Retry-After`, while other failures use `403`, without email/account input or account-existence differences. Password hashing work must not be skipped in a way that creates a useful timing oracle. Counters contain only user/session digests, window timestamps, and counts; no password, IP address, email, or proof. This is the ratified F05-D08 default.
 
 ### 3.6 Deletion, restoration, and backup consistency
 
-Proposed vault record lifecycle is `ACTIVE → DELETED → PURGED`. Restore is allowed from `DELETED` for a proposed 30-day window. Purge is an explicit dry-run-first local maintenance operation after the window; it is not IC-024 and never deletes an account. Purge removes the credential ciphertext/envelope and retains only the minimum nonsecret vault tombstone required for reconciliation, subject to a separate PO retention decision. It does not delete or shorten retention of immutable security-audit events; audit retention remains separately unresolved and no audit purge is authorized.
+The ratified vault record lifecycle is `ACTIVE → DELETED → PURGED`. Restore is allowed from `DELETED` for 30 days. Purge is an explicit dry-run-first local maintenance operation after the window; it is not IC-024 and never deletes an account. Purge removes the credential ciphertext/envelope and retains only the minimum nonsecret vault tombstone required for reconciliation under the separately controlled retention contract. It does not delete or shorten retention of immutable security-audit events. No numerical audit-retention period is approved; any purge dependent on that undefined policy remains blocked until the policy is explicitly approved, and no audit purge is authorized by F-05 G1.
 
 Database and key material form one recovery set. Before key rotation, bulk reconciliation, or purge, record a checkpoint containing database backup identity, key bundle identity/version inventory, application commit/schema, rotation-journal state, timestamp, retention state, and verification result. Back up keys and database separately with least privilege but bind them by a nonsecret manifest registered in the retained-backup inventory. A restore is acceptable only if every key version referenced by that historical database is present in its matched protected key bundle, its manifest identity/digests verify, incomplete rotations can resume, and every restored wrapped DEK/ciphertext authenticates in a no-plaintext verification pass. Recovery verification decrypts only inside the controlled verifier, authenticates expected context, records counts/safe codes, and discards buffers without emitting values. A newer database with older keys, an older database without its historical keys, or an unregistered/partially destroyed backup fails closed. Successful restore testing is required before a backup set can support a retirement decision.
 
@@ -149,35 +157,35 @@ Database and key material form one recovery set. Before key rotation, bulk recon
 
 Controlled success/failure/denial vocabulary must cover reauthentication, grant issuance/revocation/use, create, update, reveal, delete, restore, rotation, recovery verification, and purge. Events contain action, actor snapshot, vault-record opaque ID where authorized, outcome, timestamp, and safe correlation only. They contain no label, origin, username, token prefix, ciphertext, key version, secret length, submitted body, exception, session/grant value, or clipboard state. Cross-owner and unavailable denials omit the probed record ID.
 
-Reveal responses must set `Cache-Control: no-store, private`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`; no secret is server-rendered. The service may decrypt into a request-local buffer while its transaction is open, but response construction/iteration and socket handoff are barred until grant consumption and the critical reveal audit commit successfully. On rollback the buffer reference is dropped and no plaintext response is created. After commit, failure to serialize or deliver cannot restore the grant and the server cannot know whether the client received bytes. The frontend keeps plaintext only in the smallest component state needed, clears it on timeout, navigation, tab visibility loss, mutation completion, error, logout, and unmount, and must not place it in global stores. Reveal defaults masked and automatically clears after a proposed 30 seconds.
+Reveal responses must set `Cache-Control: no-store, private`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`; no secret is server-rendered. The service may decrypt into a request-local buffer while its transaction is open, but response construction/iteration and socket handoff are barred until grant consumption and the critical reveal audit commit successfully. On rollback the buffer reference is dropped and no plaintext response is created. After commit, failure to serialize or deliver cannot restore the grant and the server cannot know whether the client received bytes. The frontend keeps plaintext only in the smallest component state needed, clears it on timeout, navigation, tab visibility loss, mutation completion, error, logout, and unmount, and must not place it in global stores. Reveal defaults masked and automatically clears after 30 seconds.
 
-Clipboard copy is an explicit user action. The UI warns that the operating-system clipboard is outside application control, uses the Clipboard API only in a secure context, attempts best-effort overwrite after a proposed 30 seconds only if the clipboard still contains the copied value, and never claims guaranteed erasure. JavaScript strings, framework/runtime copies, browser history internals, process memory, swap, crash dumps, and the OS clipboard cannot be proven securely erased; clearing references and overwriting are exposure-reduction measures only. Copy is separately audited only as a controlled UI event if the PO decides it has security value; the value is never sent back for that audit.
+Clipboard copy is an explicit user action. The UI warns that the operating-system clipboard is outside application control, uses the Clipboard API only in a secure context, attempts best-effort overwrite after 30 seconds only if the clipboard still contains the copied value, and never claims guaranteed erasure. JavaScript strings, framework/runtime copies, browser history internals, process memory, swap, crash dumps, and the OS clipboard cannot be proven securely erased; clearing references and overwriting are exposure-reduction measures only. Under ratified F05-D15, clipboard copy is not audited; reveal remains audited.
 
 API errors use stable generic codes and no exception text. Encryption, database, key, and audit failures return no submitted or existing plaintext. Error-reporting integrations, request-body logging, DRF browsable forms, Django debug pages, React error payloads, source maps exposed to untrusted clients, and analytics capture must be inspected or disabled at the sensitive boundary.
 
-## 4. Open Product Owner decisions and recommendations
+## 4. Ratified Product Owner decision register
 
-Every row below is **OPEN — PO DECISION REQUIRED**. The recommendation column proposes a default and explains its trade-off; it does not record approval and cannot authorize implementation. If the PO selects a different option, the dependent requirements and task criteria must be reconciled before G1 ratification.
+The Product Owner ratified every SOL-recommended default below on 2026-11-10 at reviewed head `4b9276691f8b8135534d87ed2905f0456f81d351`. `RATIFIED` makes each choice part of the F-05 G1 requirements baseline; it does not authorize IC-021–IC-023 implementation or PR merge.
 
-| ID | State | Decision required | Recommended default and trade-off |
+| ID | State | Decision | Approved default and retained trade-off |
 | --- | --- | --- | --- |
-| F05-D01 | OPEN | Record types and field/size limits | Section 3.1 values. A smaller type set simplifies validation; SSH keys add parser/format and larger-value risk. |
-| F05-D02 | OPEN | Encryption primitive/library | AES-256-GCM through a maintained Python cryptography library. GCM is standard and fast but nonce uniqueness is critical; a new dependency requires supply-chain review. |
-| F05-D03 | OPEN | Key hierarchy | Per-owner DEKs wrapped by an external KEK. Better blast-radius and efficient KEK rotation than one global data key, at added schema/recovery complexity. |
-| F05-D04 | OPEN | KEK storage | Service-controlled local file/injected secret for MVP. Simpler than KMS but host compromise exposes the KEK; OS ACLs and backups become critical. Environment variables are easy but leak more readily to diagnostics/process inspection. |
-| F05-D05 | OPEN | Recovery/escrow posture | No admin or password-derived recovery bypass; coordinated key+DB backup only. Strong separation means key loss is permanent. Approving escrow would require a separate custodian/threat model. |
-| F05-D06 | OPEN | Grant behavior | Two-minute absolute TTL, single-use, session-bound, transactionally consumed. Single-use reduces replay but makes repeated edits/reveals require repeated password entry. A multi-use window improves UX but enlarges compromise impact and concurrency complexity. |
-| F05-D07 | OPEN | Failed-request consumption | Follow the Section 3.5 table: consume after target/business rejection; retain only after complete pre-commit rollback with no release. Always-consume is simpler and safer but less usable during transient outages. |
-| F05-D08 | OPEN | Reauthentication factor and throttle | Existing account password only for V1 plus five failures per user/session per fixed 15 minutes, three live grants per session, and ten issuances per user per 15 minutes. No approved MFA exists. Password change/reset must revoke grants; the password never derives or recovers vault keys. Stricter limits reduce guessing but may impair legitimate use. |
-| F05-D09 | OPEN | Reveal/clipboard timers | Clear reveal and best-effort clipboard after 30 seconds. Shorter limits exposure but harm usability; memory/clipboard erasure is not guaranteed. |
-| F05-D10 | OPEN | Deleted-record window and purge | 30-day reversible vault tombstone, explicit dry-run/execute credential purge. Longer retention helps recovery but retains ciphertext and key dependencies; this does not authorize audit deletion or IC-024. |
-| F05-D11 | OPEN | Credential/tombstone and audit retention | Define each separately before automatic deletion. Current audit contract prohibits unapproved audit purge. |
-| F05-D12 | OPEN | Rotation trigger and old-key retirement | Manual approved operator action for V1; no scheduled rotation. Require journal completion, current and historical-backup manifest inventory, matched restore/crypto-check, and retention disposition before retirement/destruction. |
-| F05-D13 | OPEN | Search/filter | Metadata-only exact type and bounded label/service prefix search, or no search for V1. Searchable encrypted fields would require leakage-prone indexes and is not recommended. |
-| F05-D14 | OPEN | Per-owner quantity cap | 1,000 records. A cap bounds list, rotation, backup verification, and denial-of-service cost but may require a future increase/migration. |
-| F05-D15 | OPEN | Copy audit | Do not audit clipboard copy in V1; audit reveal. Copy is client-side and unreliable to attest. If required, define it as user intent, not proof of clipboard success/erasure. |
+| F05-D01 | RATIFIED | Credential record types and field/size limits | Section 3.1 types and limits. A smaller type set simplifies validation; SSH keys add parser/format and larger-value risk. |
+| F05-D02 | RATIFIED | Encryption primitive/library | AES-256-GCM through a maintained Python cryptography library. GCM is standard and fast but nonce uniqueness is critical; a new dependency requires supply-chain review during separately authorized implementation. |
+| F05-D03 | RATIFIED | Key hierarchy | Per-owner DEKs wrapped by an external KEK. Better blast-radius and efficient KEK rotation than one global data key, at added schema/recovery complexity. |
+| F05-D04 | RATIFIED | KEK storage | Service-controlled local file or injected process secret for the local MVP. It is simpler than KMS but makes host ACLs, diagnostics, and coordinated backups critical. |
+| F05-D05 | RATIFIED | Recovery/escrow posture | No administrative or password-derived recovery bypass; recovery requires coordinated key/database backups. Key loss can be permanent; no escrow is approved. |
+| F05-D06 | RATIFIED | Grant behavior | Two-minute absolute TTL, single-use, exact-session-bound, transactionally consumed grants. Repeated sensitive operations require repeated reauthentication. |
+| F05-D07 | RATIFIED | Grant consumption and rollback semantics | Follow Section 3.5: consume after authenticated target/business rejection; retain only after complete pre-commit rollback with no state change or plaintext release; no exactly-once HTTP delivery claim. |
+| F05-D08 | RATIFIED | Password reauthentication and throttle | Existing account password plus five failures per user/session per fixed 15 minutes, three live grants per session, and ten issuances per user per 15 minutes using MySQL serialization. Password change/reset revokes grants; passwords never derive or recover vault keys. |
+| F05-D09 | RATIFIED | Reveal and clipboard timers | Clear reveal state and attempt best-effort clipboard overwrite after 30 seconds. Memory and clipboard erasure cannot be guaranteed. |
+| F05-D10 | RATIFIED | Deleted-record window and purge | Thirty-day reversible vault tombstone followed only by explicit dry-run/execute credential purge. This does not authorize audit deletion or IC-024. |
+| F05-D11 | RATIFIED | Credential/tombstone and audit retention | Credential/tombstone retention and audit retention require separate controls. **No numerical audit-retention duration is approved. Any purge dependent on an undefined retention policy remains blocked until that policy is explicitly approved; no unapproved audit purge is permitted.** |
+| F05-D12 | RATIFIED | Rotation trigger and old-key retirement | Manual approved operator action for V1; no scheduled rotation. Journal completion, current/historical backup-manifest inventory, matched restore/crypto-check, and retention disposition precede retirement or destruction. |
+| F05-D13 | RATIFIED | Search/filter | Metadata-only exact type and bounded label/service prefix filtering. Search over encrypted values and leakage-prone deterministic indexes are excluded. |
+| F05-D14 | RATIFIED | Per-owner quantity cap | Maximum 1,000 active/deleted vault records per owner, bounding list, rotation, backup-verification, and denial-of-service cost. |
+| F05-D15 | RATIFIED | Clipboard-copy audit | Do not audit clipboard copy; credential reveal remains audited. Clipboard success or erasure cannot be reliably attested. |
 
-No implementation may choose these defaults merely because they are recommended here. Ratification must record an explicit PO disposition for every D01–D15 row.
+The approved defaults remain subject to the security invariants and verification gates in this contract. Changing one requires a separately reviewed requirements decision; ratification itself still supplies no implementation authority.
 
 ## 5. Threat model and trust boundaries
 
@@ -185,7 +193,7 @@ No implementation may choose these defaults merely because they are recommended 
 
 Assets are plaintext credentials, ciphertext integrity, KEK/DEKs, grant proofs, account passwords, ownership metadata, audit integrity, and recoverability. In-scope adversaries include another authenticated user, an App Admin or IT-role user without ownership, a caller replaying object IDs/grants, CSRF/web-origin attackers, browser scripts accidentally persisting values, log/telemetry readers, database-only disclosure/tampering, concurrent requests, stale sessions, and operational restore/key mismatch.
 
-Trusted for the local MVP: the Django vault process while handling a request, Python/crypto runtime and OS RNG, MySQL for availability/transaction ordering but **not plaintext confidentiality**, the service identity and its protected key-file ACL, and approved backup custodians. OS administrator/SYSTEM, arbitrary code execution as the service identity, malicious browser extensions, an already-compromised owner endpoint, memory scraping of the API process, and physical host compromise are outside what application encryption alone can defeat and must be recorded as residual risk.
+Trusted for the local MVP: the Django API process while handling a vault request, Python/crypto runtime and OS RNG, MySQL for availability/transaction ordering but **not plaintext confidentiality**, the service identity and its protected key-file ACL, and approved backup custodians. The vault module shares the Django API process identity with other Django apps; module/import restrictions are code-level least privilege, not OS/process compromise isolation. Actual process/key-access boundaries must be verified during IC-021 before any stronger isolation claim. OS administrator/SYSTEM, arbitrary code execution as the service identity, malicious browser extensions, an already-compromised owner endpoint, memory scraping of the API process, and physical host compromise are outside what application encryption alone can defeat and must be recorded as residual risk.
 
 ### 5.2 Boundary and failure-closed matrix
 
@@ -200,7 +208,7 @@ Trusted for the local MVP: the Django vault process while handling a request, Py
 | Backup/restore | Bound DB/key manifest, all-key inventory, authentication verification | Mismatch blocks service/recovery declaration; no partial restore, key retirement, or purge |
 | Copilot/documents | No imports/routes/service credentials; separate app boundary and process key distribution | Vault access absent even when provider is later enabled; private transfer gate cannot authorize vault data |
 
-## 6. Proposed Django/DRF and MySQL architecture
+## 6. Ratified Django/DRF and MySQL architecture
 
 ### 6.1 Components
 
@@ -213,7 +221,7 @@ Trusted for the local MVP: the Django vault process while handling a request, Py
 - Existing `security_audit` is extended only by a forward migration with controlled vault actions/target type. Existing migrations are never edited.
 - The Next.js vault page consumes versioned APIs through the shared credentialed/CSRF client. Plaintext state is local and ephemeral.
 
-### 6.2 Proposed API contract
+### 6.2 Ratified API contract
 
 All responses use `{"error":{"code":"...","message":"..."}}` on error. Mutations require CSRF. IDs are UUIDs. Metadata serializers never include an encrypted value or envelope field.
 
@@ -229,7 +237,7 @@ All responses use `{"error":{"code":"...","message":"..."}}` on error. Mutations
 | `DELETE /api/v1/vault/credentials/{id}` | Yes | `204`; reversible tombstone, not physical purge |
 | `POST /api/v1/vault/credentials/{id}/restore` | Yes | `200 {"credential":metadata}` |
 
-Grant proof should be sent as `X-Vault-Grant`. The PO must approve this header and the response field name. The header must be redacted by every server/proxy logger and must not be allowed cross-origin beyond the existing exact frontend origin. `invalid_grant`, `credential_unavailable`, `conflict`, `invalid_request`, `key_unavailable`, and `service_unavailable` are proposed safe codes; messages remain fixed and non-diagnostic.
+Grant proof is sent as `X-Vault-Grant`; the response field name and header contract are part of the ratified G1 baseline. The header must be redacted by every server/proxy logger and must not be allowed cross-origin beyond the existing exact frontend origin. `invalid_grant`, `credential_unavailable`, `conflict`, `invalid_request`, `key_unavailable`, and `service_unavailable` are the ratified safe-code set; messages remain fixed and non-diagnostic.
 
 ### 6.3 Global transaction and lock order
 
@@ -247,7 +255,7 @@ No path may acquire an earlier class after a later class. In particular, **no va
 
 This ordering gives a deterministic winner. A vault operation that locks the user first may commit before a later deactivation begins; an operation that begins after deactivation commits, or waits behind its user lock, reloads the inactive user and fails. Logout, revoke, and password change similarly serialize through the user/session prefix. Requests already executing before those revocations cannot be recalled, matching the inherited F-02 boundary, but none may commit after a winning revocation transaction whose locks they waited behind.
 
-Crypto should occur outside the transaction only when its inputs are immutable and the final transaction revalidates user, session, grant, key version, record revision, owner, and lifecycle. Otherwise it occurs under the shortest safe locked transaction. A proposed create flow generates an ID/envelope before the final transaction, then revalidates key version and grant under the global order; a key-version change discards the envelope and uses the bounded pre-commit retry. Deadlock retry is at most two complete server-side attempts, never crosses a commit or response handoff, and reruns every authorization/precondition check. Tests must force both winner orders for deactivation, logout, password change, explicit revoke, and grant use using independent MySQL connections and barriers.
+Crypto should occur outside the transaction only when its inputs are immutable and the final transaction revalidates user, session, grant, key version, record revision, owner, and lifecycle. Otherwise it occurs under the shortest safe locked transaction. The ratified create flow generates an ID/envelope before the final transaction, then revalidates key version and grant under the global order; a key-version change discards the envelope and uses the bounded pre-commit retry. Deadlock retry is at most two complete server-side attempts, never crosses a commit or response handoff, and reruns every authorization/precondition check. Tests must force both winner orders for deactivation, logout, password change, explicit revoke, and grant use using independent MySQL connections and barriers.
 
 ### 6.4 Plaintext release commit barrier
 
@@ -259,7 +267,7 @@ Reveal may authenticate/decrypt into request-local process memory before commit,
 2. Integrity: envelope or AAD tampering is detected before plaintext release.
 3. Least privilege: only the active owner and vault process with key access can reveal/mutate.
 4. Availability: missing keys, crypto failures, database failures, and audit failures fail closed and surface safe actionable status without data exposure.
-5. Atomicity: record state, grant consumption, and critical audit follow the proposed failure table if the PO ratifies it; success is never reported for a rolled-back mutation.
+5. Atomicity: record state, grant consumption, and critical audit follow the ratified failure table; success is never reported for a rolled-back mutation.
 6. Concurrency: native MySQL locking/constraints prevent lost updates, duplicate active keys, double grant use, resurrection, and rotation/mutation races.
 7. Performance: metadata list/detail do not decrypt. Sensitive operation target is p95 below two seconds for local MVP excluding password-hash cost; no relaxation of password hashing or crypto validation is permitted to meet it.
 8. Accessibility: reveal/copy/delete controls are keyboard operable, labelled, focus-safe, and announced without placing plaintext in accessible status/history longer than displayed.
@@ -316,7 +324,7 @@ Reveal may authenticate/decrypt into request-local process memory before commit,
 | IC-022-AC-03 | Exact-session/user binding, absolute expiry boundary, single use, explicit revocation, logout, deactivation, password change, malformed session, and deleted/expired session all fail closed. |
 | IC-022-AC-04 | Two native-MySQL requests using one grant produce at most one committed sensitive outcome according to the PO-ratified failure table; no double reveal/mutation/audit occurs and no exactly-once HTTP delivery is claimed. |
 | IC-022-AC-05 | Grant consumption and sensitive mutation/audit are transactionally consistent; injected DB/audit/crypto failures match the PO-ratified retain-or-consume rule and never release plaintext. |
-| IC-022-AC-06 | The proposed MySQL-backed five-failures-per-user/session per fixed 15-minute throttle, three-live-grant session cap, and ten-issuances-per-user per 15-minute cap serialize under concurrency, use enumeration-safe responses, and remain explicitly subject to F05-D08 PO approval. |
+| IC-022-AC-06 | The ratified MySQL-backed five-failures-per-user/session per fixed 15-minute throttle, three-live-grant session cap, and ten-issuances-per-user per 15-minute cap serialize under concurrency and use enumeration-safe responses. |
 | IC-022-AC-07 | Frontend retains proof/plaintext only in component memory, clears on every specified event, sends the dedicated redacted header, and survives stale/out-of-order responses without restoring cleared data. |
 
 **Required negative tests:** proof replay; proof from another session/user; expired at exact boundary; revoked proof; logout/deactivation/password-change races; missing/invalid CSRF; copied header in URL/body; raw proof in error/console/storage; session decode error; clock control; password oracle and brute-force boundary.
@@ -349,7 +357,7 @@ Reveal may authenticate/decrypt into request-local process memory before commit,
 | IC-023-AC-06 | Full backend native-MySQL, frontend unit, typecheck, lint, production build, and real-browser workflows pass with exact commands/counts and honest limitations. |
 | IC-023-AC-07 | Synthetic sentinel scanning proves secrets absent from logs, audit, errors, SSR/build output, URLs, browser storage/cache, console, analytics, and unrelated F-03/F-04 responses. |
 | IC-023-AC-08 | Repository dependency/import/route tests prove Copilot, provider adapter, document services/workers, and non-vault commands have no vault decrypt/key access. |
-| IC-023-AC-09 | All F-05 living documents, decision resolutions, runbooks, threat model, recovery checkpoint, limitations, exact heads, and SOL evidence are complete; no G1 ratification or feature completion is inferred. |
+| IC-023-AC-09 | All F-05 living documents, ratified decisions, runbooks, threat model, recovery checkpoint, limitations, exact heads, and SOL evidence are complete; G1 ratification does not imply implementation acceptance or feature completion. |
 
 **Required negative tests:** expired restore; repeated purge/rotation/recovery; actor deactivation during command; lock contention; missing/wrong/corrupt key backup; DB/key epoch mismatch; clipboard API failure; hidden-tab/unmount/stale reveal; browser back/refresh; Copilot/provider/document route probes; account deletion route absence.
 
@@ -385,18 +393,18 @@ Failure injection must cover RNG/nonce failure, encrypt/decrypt/tag failure, KEK
 - Search over encrypted values, deterministic encryption, secret fingerprints/deduplication, analytics on secret fields, and production operational execution.
 - Historical “Documentation Workspaces” capabilities—owner-private Web-document workspaces, collaboration/sharing, workspace membership, ownership transfer, correction requests, and editorial review workflows—remain an unassigned product backlog. They are not F-03 as currently accepted, are not F-05, and receive no inferred Task Code or implementation authority here.
 
-## 13. Proposed implementation batches and G2 gates
+## 13. Ratified implementation decomposition and future G2 gates
 
 | Batch | Scope | Entry / exit gate |
 | --- | --- | --- |
-| A — IC-021 foundations | If PO ratifies D01–D05 and D10–D14: models, crypto/key boundary, metadata and secure CRUD services behind disabled production-sensitive routes | PO ratifies G1 and dependency; SOL G2 exact-head review of crypto, schema, ownership, tamper, rollback, and native concurrency before integration |
-| B — IC-022 grants | If PO ratifies D06–D09 including throttle defaults: reauthentication, session-bound grant state machine, integration into sensitive routes and in-memory frontend seam | Batch A accepted; SOL G2 exact-head review of proof/session/expiry/concurrency/lifecycle/browser hygiene |
-| C — IC-023 lifecycle and recovery | UI completion, rotation, deletion/restore/purge, matched backup/restore, full integrated/security/browser evidence | Batches A/B accepted; SOL G2 exact-head full-feature review, then normal G3/G4/G5 gates. IC-024 remains separately gated |
+| A — IC-021 foundations | Ratified D01–D05 and D10–D14: models, crypto/key boundary, metadata and secure CRUD services behind disabled production-sensitive routes | Separate IC-021 implementation authorization required; SOL G2 exact-head review of crypto, schema, ownership, process/key-access qualification, tamper, rollback, and native concurrency before integration |
+| B — IC-022 grants | Ratified D06–D09: reauthentication, session-bound grant state machine, MySQL throttling, integration into sensitive routes, and in-memory frontend seam | Separate IC-022 implementation authorization and accepted Batch A required; SOL G2 exact-head review of proof/session/expiry/concurrency/lifecycle/browser hygiene |
+| C — IC-023 lifecycle and recovery | UI completion, rotation, deletion/restore/purge, matched backup/restore, full integrated/security/browser evidence | Separate IC-023 implementation authorization and accepted Batches A/B required; SOL G2 exact-head full-feature review, then normal G3/G4/G5 gates. IC-024 remains separately gated |
 
-Each task requires its own branch, one primary Markdown record per meaningful checkpoint by default under ratified clarification C4, feature-level updates where necessary, exact-head review, and authorized integration only after future PO ratification. Additional records are created only when they materially improve traceability. A documentation proposal PR does not create those branches or authorize any batch.
+Each task requires separate explicit implementation authorization before its branch or runtime work begins, one primary Markdown record per meaningful checkpoint by default under ratified clarification C4, feature-level updates where necessary, exact-head review, and separately authorized integration. Additional records are created only when they materially improve traceability. G1 ratification and this documentation PR do not create implementation branches or authorize any batch.
 
 ## 14. G1 review checklist
 
-SOL should verify that approved inherited controls are accurately distinguished from new recommendations; every F05-D decision is explicit; grant failure semantics and lock order are implementable; the key hierarchy and recovery story do not imply a hidden admin bypass; audit and browser contracts exclude secrets; MySQL constraints/concurrency evidence is executable; IC-024 and infrastructure remain excluded; and task acceptance boundaries are independently reviewable.
+SOL exact-head review should verify that the 2026-11-10 ratification is accurately synchronized without changing the reviewed technical contract; every F05-D01–D15 row is RATIFIED; D11 retains no numerical audit-retention duration and blocks dependent purge; security boundaries and future G2 evidence remain intact; IC-021–IC-023 still require separate implementation authorization; and IC-024, merge, provider, infrastructure, and deployment remain excluded.
 
-**Completion state of this document:** discovery proposal prepared for SOL requirements review. **F-05 G1 is not ratified.**
+**Completion state of this document:** **PRODUCT OWNER RATIFIED — F-05 G1 COMPLETE.** Documentation synchronized for SOL exact-head review. IC-021–IC-023 implementation and PR merge remain unauthorized.

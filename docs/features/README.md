@@ -13,7 +13,7 @@ Maintain **one feature-level record** per approved feature at `docs/features/<fe
 | F-02 | Identity & Administration | IC-006–IC-008 plus F02-SEC-001; IC-024 deferred | Merged to `main` through PR #21; historical closeout record predates that merge; IC-024 remains deferred |
 | F-03 | Documentation Management | IC-009–IC-017 | Merged to `main` through PR #22; [post-merge verification](../02-Development/IC-030-F03-integration-post-merge-verification.md) complete with accepted limitations |
 | F-04 | Copilot | IC-018–IC-020 | **Formally closed** following Product Owner-authorized PR #26 merge; historical [post-merge verification](../02-Development/F-04-post-merge-verification-and-closure.md) retains its pre-closure snapshot |
-| F-05 | Personal Credential Vault | IC-021–IC-023 | [G1 discovery proposal prepared](F-05-consolidated-g1-proposal.md); not ratified; implementation not authorized |
+| F-05 | Personal Credential Vault | IC-021–IC-023 | **G1 RATIFIED — IC-021–IC-023 IMPLEMENTATION NOT YET AUTHORIZED**; [ratified contract](F-05-consolidated-g1-proposal.md) |
 | F-06 | MVP Acceptance | IC-025 | Not started |
 
 Standalone low-risk tasks may follow the Product Owner-authorized [Section 3A fast track](../process/TTDM-WA-001.md#section-3a--standalone-task-fast-track-controlled-exception) without joining a feature. Such tasks still require a reviewed PR and Product Owner approval before merging into `main`.
