@@ -31,3 +31,18 @@ Missing sessions receive structured `401`; CSRF failures receive structured
 `403` with code `csrf_failed`. The only credentialed browser origin is
 `http://localhost:3000`; wildcard CORS is disabled.
 
+## Personal credential vault (IC-021 boundary)
+
+| Request | Current behavior |
+| --- | --- |
+| `GET /api/v1/vault/credentials?cursor=&type=&prefix=&limit=` | Active authenticated owner's bounded metadata-only keyset page; exact type and label/service prefix filters |
+| `GET /api/v1/vault/credentials/{uuid}` | Active authenticated owner's metadata only; generic unavailable otherwise |
+| `POST /api/v1/vault/credentials` | CSRF protected; `503 sensitive_operation_unavailable` pending IC-022 |
+| `PATCH/DELETE /api/v1/vault/credentials/{uuid}` | CSRF protected; disabled pending IC-022 |
+| `POST .../{uuid}/reveal` and `POST .../{uuid}/restore` | CSRF protected; disabled pending IC-022 |
+
+Metadata responses never include plaintext encrypted fields, ciphertext,
+nonce, tag, wrapped key, or key version. Internal sensitive services implement
+the ratified CRUD contract for IC-021 verification, but no production route
+can obtain the restricted test authorization proof.
+

@@ -62,3 +62,17 @@ IC-006 also extends the audit action/target constraints through the forward
 `security_audit.0002_ic006_event_vocabulary` migration without altering the
 applied IC-008 migration.
 
+IC-021 adds `vault_vaultrecord` and `vault_vaultownerkey`. Records use UUID
+identifiers, protected owner foreign keys, controlled credential/lifecycle
+values, optimistic revisions, metadata-only searchable columns, and versioned
+AES-GCM envelope columns. Lifecycle checks keep delete/restore timestamps
+consistent. Owner keys contain only wrapped 32-byte per-owner DEKs and enforce
+one active version per owner; the external KEK is not a database field.
+Indexes support owner/state/time and owner/type/time reads. The application
+serializes user, record, and key access in the ratified global lock order and
+counts both active and deleted rows toward the 1,000-record owner cap.
+
+The forward `security_audit.0010` migration extends controlled action/target
+checks for vault create, update, reveal, delete, and restore. It does not add
+sensitive audit columns or edit prior migrations.
+

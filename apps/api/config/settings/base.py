@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "security_audit",
     "documents",
     "copilot",
+    "vault",
     "health",
     "session_auth",
 ]
@@ -85,6 +86,8 @@ COPILOT_PROVIDER_MAX_RESPONSE_CHARACTERS = 8_000
 COPILOT_CONVERSATION_MAX_MESSAGES = 100
 COPILOT_CONVERSATION_PAGE_SIZE_MAX = 100
 COPILOT_CONVERSATION_RETENTION_DAYS = 30
+
+VAULT_KEK_FILE = os.environ.get("VAULT_KEK_FILE", "")
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True

@@ -7,6 +7,7 @@ from documents.views import (DocumentArchiveView, DocumentCollectionView, Docume
                              DocumentDownloadView, DocumentRestoreView, DocumentRetryView, DocumentStatusView)
 from session_auth.views import CsrfView, LoginView, LogoutView, MeView
 from copilot.views import ConversationCollectionView, ConversationDetailView, ConversationMessageView
+from vault.views import VaultCredentialCollectionView, VaultCredentialDetailView, VaultCredentialRevealView, VaultCredentialRestoreView
 
 urlpatterns = [
     path("api/v1/health", HealthView.as_view(), name="health"),
@@ -32,5 +33,9 @@ urlpatterns = [
     path("api/v1/copilot/conversations", ConversationCollectionView.as_view(), name="copilot-conversation-list"),
     path("api/v1/copilot/conversations/<uuid:conversation_id>", ConversationDetailView.as_view(), name="copilot-conversation-detail"),
     path("api/v1/copilot/conversations/<uuid:conversation_id>/messages", ConversationMessageView.as_view(), name="copilot-conversation-messages"),
+    path("api/v1/vault/credentials", VaultCredentialCollectionView.as_view(), name="vault-credential-list"),
+    path("api/v1/vault/credentials/<uuid:credential_id>", VaultCredentialDetailView.as_view(), name="vault-credential-detail"),
+    path("api/v1/vault/credentials/<uuid:credential_id>/reveal", VaultCredentialRevealView.as_view(), name="vault-credential-reveal"),
+    path("api/v1/vault/credentials/<uuid:credential_id>/restore", VaultCredentialRestoreView.as_view(), name="vault-credential-restore"),
 ]
 handler404 = "config.errors.structured_not_found"
