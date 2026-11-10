@@ -10,12 +10,16 @@ Maintain **one feature-level record** per approved feature at `docs/features/<fe
 | --- | --- | --- | --- |
 | F-00 | Foundation | IC-001 | Merged under original TTDM workflow; documentation closeout separate |
 | F-01 | Core Platform | IC-002–IC-005 | **Feature Completed**; PO accepted; [PR #9](https://github.com/acarbonilla/it_copilot/pull/9) merged into `main`; [acceptance review](F-01-acceptance-review.md) |
-| F-02 | Identity & Administration | IC-006–IC-008 plus F02-SEC-001; IC-024 deferred | [Final acceptance evidence complete](F-02-final-acceptance-review.md); SOL review and Product Owner final acceptance pending |
-| F-03 | Documentation Management | IC-009–IC-017 | [Consolidated G1 ratified and finalized](F-03-consolidated-g1-proposal.md); Batch A authorized, later batches gated by SOL G2 |
-| F-04 | Copilot | IC-018–IC-020 | Not started |
-| F-05 | Credentials Vault | IC-021–IC-023 | Not started |
+| F-02 | Identity & Administration | IC-006–IC-008 plus F02-SEC-001; IC-024 deferred | Merged to `main` through PR #21; historical closeout record predates that merge; IC-024 remains deferred |
+| F-03 | Documentation Management | IC-009–IC-017 | Merged to `main` through PR #22; [post-merge verification](../02-Development/IC-030-F03-integration-post-merge-verification.md) complete with accepted limitations |
+| F-04 | Copilot | IC-018–IC-020 | Tasks merged through PRs #23–#25; [post-merge verification](../02-Development/F-04-post-merge-verification-and-closure.md) merged through PR #26 and pending SOL closure review |
+| F-05 | Personal Credential Vault | IC-021–IC-023 | [G1 discovery proposal prepared](F-05-consolidated-g1-proposal.md); not ratified; implementation not authorized |
 | F-06 | MVP Acceptance | IC-025 | Not started |
 
 Standalone low-risk tasks may follow the Product Owner-authorized [Section 3A fast track](../process/TTDM-WA-001.md#section-3a--standalone-task-fast-track-controlled-exception) without joining a feature. Such tasks still require a reviewed PR and Product Owner approval before merging into `main`.
 
 Do not create feature branches or begin Task Codes solely because they appear in this registry.
+
+## Unassigned historical capability backlog
+
+Earlier requirements referenced owner-private Web-document or “Documentation Workspaces” capabilities that are not the accepted F-03 Documentation Management scope: personal workspaces, collaboration/sharing, workspace membership, and ownership transfer. They remain outstanding product-discovery items. This registry does not silently assign them to F-03, F-05, or new Task Codes, and records no implementation authorization for them.
