@@ -16,6 +16,7 @@ from accounts.models import User
 from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event, record_denied_event_best_effort
 
+from .authorization import SensitiveAuthorization
 # Added by Me.
 import ipaddress
 
@@ -32,6 +33,7 @@ from .crypto import (
 )
 from .keys import load_kek
 from .models import DEK_BYTES, VaultOwnerKey, VaultRecord
+from .grants import GrantDenied, GrantServiceError, consume_grant, lock_valid_grant
 
 
 MAX_RECORDS_PER_OWNER = 1_000
@@ -54,8 +56,6 @@ class VaultSensitiveAuthorizationRequired(PermissionDenied):
 class VaultServiceUnavailable(Exception):
     pass
 
-
-@dataclass
 
 @dataclass
 class DeferredReveal:
@@ -112,9 +112,12 @@ def _active_actor(actor, *, lock=False):
 
 
 def _require_sensitive(actor, authorization):
-    """IC-021 production gate: always deny until IC-022 grant validation."""
-    _audit_unavailable(actor)
-    raise VaultSensitiveAuthorizationRequired("Sensitive vault operation is unavailable")
+    if not isinstance(authorization, SensitiveAuthorization):
+        raise VaultSensitiveAuthorizationRequired("Sensitive vault operation is unavailable")
+    try:
+        return lock_valid_grant(actor=actor, session_key=authorization.session_key, proof=authorization.proof)
+    except GrantDenied:
+        raise VaultSensitiveAuthorizationRequired("Sensitive vault operation is unavailable") from None
 
 
 def _critical_audit(**event):
@@ -428,36 +431,44 @@ def _decrypt_payload(record, dek):
 
 
 def create_credential(*, actor, authorization, credential_type, label, secret_fields, service_label="", origin=""):
-    _require_sensitive(actor, authorization)
-    metadata = _metadata(credential_type=credential_type, label=label, service_label=service_label, origin=origin)
-    payload = _encrypted_payload(credential_type, secret_fields)
+    rejected = None
     try:
         with transaction.atomic():
             owner = _active_actor(actor, lock=True)
             if owner is None:
                 raise VaultUnavailableError("Vault is unavailable")
-            if VaultRecord.objects.filter(owner=owner).count() >= MAX_RECORDS_PER_OWNER:
-                raise VaultConflictError("Vault record limit reached")
-            key_row, dek = _owner_key(owner)
-            record = VaultRecord(id=uuid.uuid4(), owner=owner, key_version=key_row.key_version, nonce=b"0" * 12, ciphertext=b"0", tag=b"0" * 16, **metadata)
-            envelope = _encrypt_payload(record, payload, dek, key_row.key_version)
-            record.nonce, record.ciphertext, record.tag = envelope.nonce, envelope.ciphertext, envelope.tag
-            record.save(force_insert=True)
-            _critical_audit(
-                action=SecurityAuditEvent.Action.VAULT_CREATED,
-                actor_user_id=owner.pk,
-                target_type=SecurityAuditEvent.TargetType.VAULT_RECORD,
-                target_id=str(record.pk),
-                outcome=SecurityAuditEvent.Outcome.SUCCESS,
-            )
-            return record
-    except (VaultCryptoError, DatabaseError) as exc:
+            grant = _require_sensitive(owner, authorization)
+            try:
+                metadata = _metadata(credential_type=credential_type, label=label, service_label=service_label, origin=origin)
+                payload = _encrypted_payload(credential_type, secret_fields)
+                if VaultRecord.objects.filter(owner=owner).count() >= MAX_RECORDS_PER_OWNER:
+                    raise VaultConflictError("Vault record limit reached")
+                key_row, dek = _owner_key(owner)
+                record = VaultRecord(id=uuid.uuid4(), owner=owner, key_version=key_row.key_version,
+                    nonce=b"0" * 12, ciphertext=b"0", tag=b"0" * 16, **metadata)
+                envelope = _encrypt_payload(record, payload, dek, key_row.key_version)
+                record.nonce, record.ciphertext, record.tag = envelope.nonce, envelope.ciphertext, envelope.tag
+                record.save(force_insert=True)
+            except (ValidationError, VaultConflictError, VaultUnavailableError) as exc:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk, denied=True)
+                rejected = exc
+            else:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk)
+                _critical_audit(action=SecurityAuditEvent.Action.VAULT_CREATED, actor_user_id=owner.pk,
+                    target_type=SecurityAuditEvent.TargetType.VAULT_RECORD, target_id=str(record.pk),
+                    outcome=SecurityAuditEvent.Outcome.SUCCESS)
+    except (VaultCryptoError, DatabaseError, GrantServiceError) as exc:
         raise VaultServiceUnavailable("Vault operation could not be completed") from exc
+    if rejected:
+        raise rejected
+    return record
 
 
 
-def _locked_record(actor, record_id, *, include_deleted=False, lock_owner_keys=False):
-    owner = _active_actor(actor, lock=True)
+def _locked_record(actor, record_id, *, include_deleted=False, lock_owner_keys=False, owner=None):
+    owner = owner or _active_actor(actor, lock=True)
 
     if owner is None:
         raise VaultUnavailableError("Credential is unavailable")
@@ -497,96 +508,107 @@ def _locked_record(actor, record_id, *, include_deleted=False, lock_owner_keys=F
 
 
 def update_credential(*, actor, authorization, record_id, expected_revision, metadata_changes=None, secret_fields=None):
-    _require_sensitive(actor, authorization)
-    if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) or expected_revision <= 0:
-        raise ValidationError({"expected_revision": "Must be a positive integer"})
-    if not metadata_changes and secret_fields is None:
-        raise ValidationError("At least one field is required")
+    rejected = None
     try:
         with transaction.atomic():
-            owner, key_rows, record = _locked_record(actor, record_id, lock_owner_keys=secret_fields is not None)
-            if record.revision != expected_revision:
-                raise VaultConflictError("Credential was modified by another request")
-            fields = []
-            if metadata_changes:
-                if set(metadata_changes) - {"label", "service_label", "origin"}:
-                    raise ValidationError("Unsupported metadata field")
-                metadata = _metadata(
-                    credential_type=record.credential_type,
-                    label=metadata_changes.get("label", record.label),
-                    service_label=metadata_changes.get("service_label", record.service_label),
-                    origin=metadata_changes.get("origin", record.origin),
-                )
-                for name in ("label", "service_label", "origin"):
-                    if getattr(record, name) != metadata[name]:
-                        setattr(record, name, metadata[name]); fields.append(name)
-            if secret_fields is not None:
-                changes = _encrypted_payload(record.credential_type, secret_fields, require_secret=False)
-                if not changes:
-                    raise ValidationError("At least one encrypted field must change")
-                existing_dek = _unwrap_key_row(owner, _key_by_version(key_rows, record.key_version))
-                payload = _decrypt_payload(record, existing_dek)
-                payload.update(changes)
-                payload = _encrypted_payload(record.credential_type, payload)
-                key_row = next((row for row in key_rows if row.active_slot is True), None)
-                dek = _unwrap_key_row(owner, key_row)
-                envelope = _encrypt_payload(record, payload, dek, key_row.key_version)
-                record.key_version, record.nonce, record.ciphertext, record.tag = key_row.key_version, envelope.nonce, envelope.ciphertext, envelope.tag
-                fields.extend(("key_version", "nonce", "ciphertext", "tag"))
-            if not fields:
-                raise ValidationError("At least one field must change")
-            record.revision += 1
-            record.save(update_fields=(*dict.fromkeys(fields), "revision", "updated_at"))
-            _critical_audit(
-                action=SecurityAuditEvent.Action.VAULT_UPDATED,
-                actor_user_id=owner.pk,
-                target_type=SecurityAuditEvent.TargetType.VAULT_RECORD,
-                target_id=str(record.pk),
-                outcome=SecurityAuditEvent.Outcome.SUCCESS,
-            )
-            return record
-    except (VaultCryptoError, DatabaseError) as exc:
+            owner = _active_actor(actor, lock=True)
+            if owner is None:
+                raise VaultUnavailableError("Credential is unavailable")
+            grant = _require_sensitive(owner, authorization)
+            try:
+                if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) or expected_revision <= 0:
+                    raise ValidationError({"expected_revision": "Must be a positive integer"})
+                if not metadata_changes and secret_fields is None:
+                    raise ValidationError("At least one field is required")
+                if metadata_changes is not None and not isinstance(metadata_changes, dict):
+                    raise ValidationError("Metadata changes must be an object")
+                owner, key_rows, record = _locked_record(actor, record_id,
+                    lock_owner_keys=secret_fields is not None, owner=owner)
+                if record.revision != expected_revision:
+                    raise VaultConflictError("Credential was modified by another request")
+                fields = []
+                if metadata_changes:
+                    if set(metadata_changes) - {"label", "service_label", "origin"}:
+                        raise ValidationError("Unsupported metadata field")
+                    metadata = _metadata(credential_type=record.credential_type,
+                        label=metadata_changes.get("label", record.label),
+                        service_label=metadata_changes.get("service_label", record.service_label),
+                        origin=metadata_changes.get("origin", record.origin))
+                    for name in ("label", "service_label", "origin"):
+                        if getattr(record, name) != metadata[name]:
+                            setattr(record, name, metadata[name]); fields.append(name)
+                if secret_fields is not None:
+                    changes = _encrypted_payload(record.credential_type, secret_fields, require_secret=False)
+                    if not changes:
+                        raise ValidationError("At least one encrypted field must change")
+                    existing_dek = _unwrap_key_row(owner, _key_by_version(key_rows, record.key_version))
+                    payload = _decrypt_payload(record, existing_dek)
+                    payload.update(changes)
+                    payload = _encrypted_payload(record.credential_type, payload)
+                    key_row = next((row for row in key_rows if row.active_slot is True), None)
+                    dek = _unwrap_key_row(owner, key_row)
+                    envelope = _encrypt_payload(record, payload, dek, key_row.key_version)
+                    record.key_version, record.nonce, record.ciphertext, record.tag = (
+                        key_row.key_version, envelope.nonce, envelope.ciphertext, envelope.tag)
+                    fields.extend(("key_version", "nonce", "ciphertext", "tag"))
+                if not fields:
+                    raise ValidationError("At least one field must change")
+                record.revision += 1
+                record.save(update_fields=(*dict.fromkeys(fields), "revision", "updated_at"))
+            except (ValidationError, VaultConflictError, VaultUnavailableError) as exc:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk, denied=True)
+                rejected = exc
+            else:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk)
+                _critical_audit(action=SecurityAuditEvent.Action.VAULT_UPDATED, actor_user_id=owner.pk,
+                    target_type=SecurityAuditEvent.TargetType.VAULT_RECORD, target_id=str(record.pk),
+                    outcome=SecurityAuditEvent.Outcome.SUCCESS)
+    except (VaultCryptoError, DatabaseError, GrantServiceError) as exc:
         raise VaultServiceUnavailable("Vault operation could not be completed") from exc
+    if rejected:
+        raise rejected
+    return record
 
 
 
 def reveal_credential(*, actor, authorization, record_id):
-    _require_sensitive(actor, authorization)
     deferred = DeferredReveal()
+    rejected = None
 
     try:
         with transaction.atomic():
-            owner, key_rows, record = _locked_record(
-                actor,
-                record_id,
-                lock_owner_keys=True,
-            )
+            owner = _active_actor(actor, lock=True)
+            if owner is None:
+                raise VaultUnavailableError("Credential is unavailable")
+            grant = _require_sensitive(owner, authorization)
+            try:
+                owner, key_rows, record = _locked_record(actor, record_id, lock_owner_keys=True, owner=owner)
+            except VaultUnavailableError as exc:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk, denied=True)
+                rejected = exc
+            else:
+                dek = _unwrap_key_row(owner, _key_by_version(key_rows, record.key_version))
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk)
+                _critical_audit(action=SecurityAuditEvent.Action.VAULT_REVEALED, actor_user_id=owner.pk,
+                    target_type=SecurityAuditEvent.TargetType.VAULT_RECORD, target_id=str(record.pk),
+                    outcome=SecurityAuditEvent.Outcome.SUCCESS)
 
-            dek = _unwrap_key_row(
-                owner,
-                _key_by_version(key_rows, record.key_version),
-            )
+                def complete_after_commit():
+                    try:
+                        deferred._complete(_decrypt_payload(record, dek))
+                    except Exception:
+                        deferred.discard()
+                transaction.on_commit(complete_after_commit)
 
-            _critical_audit(
-                action=SecurityAuditEvent.Action.VAULT_REVEALED,
-                actor_user_id=owner.pk,
-                target_type=SecurityAuditEvent.TargetType.VAULT_RECORD,
-                target_id=str(record.pk),
-                outcome=SecurityAuditEvent.Outcome.SUCCESS,
-            )
-
-            def complete_after_commit():
-                try:
-                    payload = _decrypt_payload(record, dek)
-                    deferred._complete(payload)
-                except Exception:
-                    deferred.discard()
-
-            transaction.on_commit(complete_after_commit)
-
+        if rejected:
+            raise rejected
         return deferred
 
-    except (VaultCryptoError, DatabaseError):
+    except (VaultCryptoError, DatabaseError, GrantServiceError):
         deferred.discard()
         raise VaultServiceUnavailable(
             "Vault operation could not be completed"
@@ -599,41 +621,104 @@ def reveal_credential(*, actor, authorization, record_id):
 
 
 def delete_credential(*, actor, authorization, record_id, expected_revision):
-    _require_sensitive(actor, authorization)
+    rejected = None
     try:
         with transaction.atomic():
-            owner, _key_rows, record = _locked_record(actor, record_id)
-            if record.revision != expected_revision:
-                raise VaultConflictError("Credential was modified by another request")
-            now = timezone.now()
-            record.lifecycle = VaultRecord.Lifecycle.DELETED
-            record.deleted_at = now
-            record.restore_expires_at = now + timedelta(days=RESTORE_WINDOW_DAYS)
-            record.revision += 1
-            record.save(update_fields=("lifecycle", "deleted_at", "restore_expires_at", "revision", "updated_at"))
-            _critical_audit(action=SecurityAuditEvent.Action.VAULT_DELETED, actor_user_id=owner.pk,
-                target_type=SecurityAuditEvent.TargetType.VAULT_RECORD, target_id=str(record.pk), outcome=SecurityAuditEvent.Outcome.SUCCESS)
-            return record
-    except DatabaseError as exc:
+            owner = _active_actor(actor, lock=True)
+            if owner is None:
+                raise VaultUnavailableError("Credential is unavailable")
+            grant = _require_sensitive(owner, authorization)
+            try:
+                if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) or expected_revision <= 0:
+                    raise ValidationError({"expected_revision": "Must be a positive integer"})
+                owner, _key_rows, record = _locked_record(actor, record_id, owner=owner)
+                if record.revision != expected_revision:
+                    raise VaultConflictError("Credential was modified by another request")
+                now = timezone.now()
+                record.lifecycle = VaultRecord.Lifecycle.DELETED
+                record.deleted_at = now
+                record.restore_expires_at = now + timedelta(days=RESTORE_WINDOW_DAYS)
+                record.revision += 1
+                record.save(update_fields=("lifecycle", "deleted_at", "restore_expires_at", "revision", "updated_at"))
+            except (ValidationError, VaultConflictError, VaultUnavailableError) as exc:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk, denied=True)
+                rejected = exc
+            else:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk)
+                _critical_audit(action=SecurityAuditEvent.Action.VAULT_DELETED, actor_user_id=owner.pk,
+                    target_type=SecurityAuditEvent.TargetType.VAULT_RECORD, target_id=str(record.pk),
+                    outcome=SecurityAuditEvent.Outcome.SUCCESS)
+    except (DatabaseError, GrantServiceError) as exc:
         raise VaultServiceUnavailable("Vault operation could not be completed") from exc
+    if rejected:
+        raise rejected
+    return record
 
 
 def restore_credential(*, actor, authorization, record_id, expected_revision):
-    _require_sensitive(actor, authorization)
+    rejected = None
     try:
         with transaction.atomic():
-            owner, _key_rows, record = _locked_record(actor, record_id, include_deleted=True)
-            if record.revision != expected_revision or record.lifecycle != VaultRecord.Lifecycle.DELETED:
-                raise VaultConflictError("Credential cannot be restored")
-            if record.restore_expires_at is None or record.restore_expires_at <= timezone.now():
-                raise VaultConflictError("Credential cannot be restored")
-            record.lifecycle = VaultRecord.Lifecycle.ACTIVE
-            record.deleted_at = None
-            record.restore_expires_at = None
-            record.revision += 1
-            record.save(update_fields=("lifecycle", "deleted_at", "restore_expires_at", "revision", "updated_at"))
-            _critical_audit(action=SecurityAuditEvent.Action.VAULT_RESTORED, actor_user_id=owner.pk,
-                target_type=SecurityAuditEvent.TargetType.VAULT_RECORD, target_id=str(record.pk), outcome=SecurityAuditEvent.Outcome.SUCCESS)
-            return record
-    except DatabaseError as exc:
+            owner = _active_actor(actor, lock=True)
+            if owner is None:
+                raise VaultUnavailableError("Credential is unavailable")
+            grant = _require_sensitive(owner, authorization)
+            try:
+                if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) or expected_revision <= 0:
+                    raise ValidationError({"expected_revision": "Must be a positive integer"})
+                owner, _key_rows, record = _locked_record(actor, record_id, include_deleted=True, owner=owner)
+                if record.revision != expected_revision or record.lifecycle != VaultRecord.Lifecycle.DELETED:
+                    raise VaultConflictError("Credential cannot be restored")
+                if record.restore_expires_at is None or record.restore_expires_at <= timezone.now():
+                    raise VaultConflictError("Credential cannot be restored")
+                record.lifecycle = VaultRecord.Lifecycle.ACTIVE
+                record.deleted_at = None
+                record.restore_expires_at = None
+                record.revision += 1
+                record.save(update_fields=("lifecycle", "deleted_at", "restore_expires_at", "revision", "updated_at"))
+            except (ValidationError, VaultConflictError, VaultUnavailableError) as exc:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk, denied=True)
+                rejected = exc
+            else:
+                if grant is not None:
+                    consume_grant(grant, actor_user_id=owner.pk)
+                _critical_audit(action=SecurityAuditEvent.Action.VAULT_RESTORED, actor_user_id=owner.pk,
+                    target_type=SecurityAuditEvent.TargetType.VAULT_RECORD, target_id=str(record.pk),
+                    outcome=SecurityAuditEvent.Outcome.SUCCESS)
+    except (DatabaseError, GrantServiceError) as exc:
         raise VaultServiceUnavailable("Vault operation could not be completed") from exc
+    if rejected:
+        raise rejected
+    return record
+
+
+def _mysql_deadlock(error):
+    cause = getattr(error, "__cause__", None)
+    if not isinstance(cause, DatabaseError):
+        return False
+    values = list(getattr(cause, "args", ()))
+    values.extend(getattr(getattr(cause, "__cause__", None), "args", ()))
+    return any(value in (1205, 1213) for value in values if isinstance(value, int))
+
+
+def _with_bounded_deadlock_retry(operation):
+    def wrapped(*args, **kwargs):
+        for attempt in range(2):
+            try:
+                return operation(*args, **kwargs)
+            except VaultServiceUnavailable as exc:
+                if attempt or not _mysql_deadlock(exc):
+                    raise
+        raise VaultServiceUnavailable("Vault operation could not be completed")
+    wrapped.__name__ = operation.__name__
+    return wrapped
+
+
+create_credential = _with_bounded_deadlock_retry(create_credential)
+update_credential = _with_bounded_deadlock_retry(update_credential)
+reveal_credential = _with_bounded_deadlock_retry(reveal_credential)
+delete_credential = _with_bounded_deadlock_retry(delete_credential)
+restore_credential = _with_bounded_deadlock_retry(restore_credential)

@@ -134,3 +134,68 @@ class VaultRecord(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean(validate_unique=False, validate_constraints=False)
         return super().save(*args, **kwargs)
+
+
+class SensitiveOperationGrant(models.Model):
+    class Scope(models.TextChoices):
+        VAULT_SENSITIVE = "VAULT_SENSITIVE", "Vault sensitive operation"
+
+    class RevocationReason(models.TextChoices):
+        EXPLICIT = "EXPLICIT", "Explicit revocation"
+        LOGOUT = "LOGOUT", "Logout"
+        ACCOUNT_DEACTIVATED = "ACCOUNT_DEACTIVATED", "Account deactivated"
+        PASSWORD_CHANGED = "PASSWORD_CHANGED", "Password changed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="vault_sensitive_grants")
+    session_digest = models.CharField(max_length=64, editable=False)
+    proof_digest = models.CharField(max_length=64, unique=True, editable=False)
+    scope = models.CharField(max_length=32, choices=Scope.choices, default=Scope.VAULT_SENSITIVE, editable=False)
+    issued_at = models.DateTimeField(editable=False)
+    expires_at = models.DateTimeField(editable=False)
+    consumed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    revoked_at = models.DateTimeField(null=True, blank=True, editable=False)
+    revocation_reason = models.CharField(
+        max_length=32, choices=RevocationReason.choices, null=True, blank=True, editable=False
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("user", "session_digest", "expires_at"), name="vault_grant_session_idx"),
+            models.Index(fields=("user", "expires_at"), name="vault_grant_user_exp_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(expires_at__gt=models.F("issued_at")), name="vault_grant_expiry_after_issue"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(revoked_at__isnull=True, revocation_reason__isnull=True)
+                    | models.Q(revoked_at__isnull=False, revocation_reason__isnull=False)
+                ),
+                name="vault_grant_revocation_matches",
+            ),
+            models.CheckConstraint(
+                condition=~(models.Q(consumed_at__isnull=False) & models.Q(revoked_at__isnull=False)),
+                name="vault_grant_terminal_state_exclusive",
+            ),
+        ]
+
+
+class UserReauthenticationThrottle(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="vault_user_throttle")
+    failure_window_started_at = models.DateTimeField()
+    failure_count = models.PositiveSmallIntegerField(default=0)
+    issuance_window_started_at = models.DateTimeField()
+    issuance_count = models.PositiveSmallIntegerField(default=0)
+
+
+class SessionReauthenticationThrottle(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="vault_session_throttles")
+    session_digest = models.CharField(max_length=64)
+    failure_window_started_at = models.DateTimeField()
+    failure_count = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("user", "session_digest"), name="vault_session_throttle_unique"),
+        ]
+        indexes = [models.Index(fields=("user", "session_digest"), name="vault_session_throttle_idx")]

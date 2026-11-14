@@ -13,15 +13,15 @@ class VaultApiTests(TestCase):
         self.assertEqual(client.get("/api/v1/vault/credentials").status_code, 401)
         self.assertEqual(client.post("/api/v1/vault/credentials", {}).status_code, 401)
 
-    def test_sensitive_production_routes_are_disabled_and_csrf_protected(self):
+    def test_sensitive_production_routes_require_csrf_and_grant(self):
         client = Client(enforce_csrf_checks=True)
         client.force_login(self.user)
         self.assertEqual(client.post("/api/v1/vault/credentials", {}).status_code, 403)
         token_response = client.get("/api/v1/auth/csrf")
         token = token_response.json()["csrfToken"]
         response = client.post("/api/v1/vault/credentials", {}, HTTP_X_CSRFTOKEN=token)
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json()["error"]["code"], "sensitive_operation_unavailable")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"]["code"], "invalid_grant")
 
     def test_metadata_list_is_owner_scoped_and_contains_no_envelope(self):
         client = Client()

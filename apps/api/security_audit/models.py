@@ -30,6 +30,12 @@ ACTION_VALUES = (
     "vault.revealed",
     "vault.deleted",
     "vault.restored",
+    "vault.reauthentication_succeeded",
+    "vault.reauthentication_denied",
+    "vault.grant_issued",
+    "vault.grant_used",
+    "vault.grant_denied",
+    "vault.grant_revoked",
 )
 TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource", "vault_record")
 OUTCOME_VALUES = ("success", "denied", "failure")
@@ -64,6 +70,12 @@ class SecurityAuditEvent(models.Model):
         VAULT_REVEALED = "vault.revealed", "Vault credential revealed"
         VAULT_DELETED = "vault.deleted", "Vault credential deleted"
         VAULT_RESTORED = "vault.restored", "Vault credential restored"
+        VAULT_REAUTHENTICATION_SUCCEEDED = "vault.reauthentication_succeeded", "Vault reauthentication succeeded"
+        VAULT_REAUTHENTICATION_DENIED = "vault.reauthentication_denied", "Vault reauthentication denied"
+        VAULT_GRANT_ISSUED = "vault.grant_issued", "Vault grant issued"
+        VAULT_GRANT_USED = "vault.grant_used", "Vault grant used"
+        VAULT_GRANT_DENIED = "vault.grant_denied", "Vault grant denied"
+        VAULT_GRANT_REVOKED = "vault.grant_revoked", "Vault grant revoked"
 
     class TargetType(models.TextChoices):
         ACCOUNT = "account", "Account"

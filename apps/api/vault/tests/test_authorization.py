@@ -15,9 +15,13 @@ class FakeActor:
 
 
 class VaultAuthorizationIsolationTests(SimpleTestCase):
-    def test_production_authorization_cannot_be_constructed(self):
-        with self.assertRaises(PermissionError):
+    def test_production_authorization_is_only_an_untrusted_carrier(self):
+        with self.assertRaises(TypeError):
             SensitiveAuthorization()
+        authorization = SensitiveAuthorization(proof="x" * 43, session_key="untrusted")
+        with patch("vault.services.lock_valid_grant", side_effect=__import__("vault.grants", fromlist=["GrantDenied"]).GrantDenied):
+            with self.assertRaises(VaultSensitiveAuthorizationRequired):
+                _require_sensitive(FakeActor(), authorization)
 
     def test_production_service_rejects_missing_and_test_authorization(self):
         actor = FakeActor()
