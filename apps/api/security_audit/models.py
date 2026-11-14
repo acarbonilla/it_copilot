@@ -25,8 +25,13 @@ ACTION_VALUES = (
     "document.reconciled",
     "document.processing_succeeded",
     "document.processing_failed",
+    "vault.created",
+    "vault.updated",
+    "vault.revealed",
+    "vault.deleted",
+    "vault.restored",
 )
-TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource")
+TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource", "vault_record")
 OUTCOME_VALUES = ("success", "denied", "failure")
 
 
@@ -54,6 +59,11 @@ class SecurityAuditEvent(models.Model):
         DOCUMENT_RECONCILED = "document.reconciled", "Document recovery reconciled"
         DOCUMENT_PROCESSING_SUCCEEDED = "document.processing_succeeded", "Document processing succeeded"
         DOCUMENT_PROCESSING_FAILED = "document.processing_failed", "Document processing failed"
+        VAULT_CREATED = "vault.created", "Vault credential created"
+        VAULT_UPDATED = "vault.updated", "Vault credential updated"
+        VAULT_REVEALED = "vault.revealed", "Vault credential revealed"
+        VAULT_DELETED = "vault.deleted", "Vault credential deleted"
+        VAULT_RESTORED = "vault.restored", "Vault credential restored"
 
     class TargetType(models.TextChoices):
         ACCOUNT = "account", "Account"
@@ -61,6 +71,7 @@ class SecurityAuditEvent(models.Model):
         AUTHENTICATION = "authentication", "Authentication"
         IT_DOCUMENT = "it_document", "IT document"
         PRIVATE_RESOURCE = "private_resource", "Private resource"
+        VAULT_RECORD = "vault_record", "Vault record"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success", "Success"

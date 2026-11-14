@@ -28,3 +28,17 @@ AI integrations remain deferred.
 
 Each later task must update this document when it changes deployed components, communication paths, or ownership boundaries. Planned features must not be described as operational.
 
+## IC-021 vault boundary
+
+The Django API now owns a vault domain and narrow cryptographic service. A
+service-controlled external KEK wraps per-owner DEKs; those DEKs encrypt record
+payloads with AES-256-GCM. MySQL stores metadata, versioned envelopes, wrapped
+DEKs, lifecycle, and append-only controlled audits, but never KEK or plaintext.
+The API process has access to both the external KEK and database and therefore
+remains a shared-process residual risk; module separation is not OS isolation.
+
+Metadata reads are active-session and owner scoped. All sensitive production
+routes remain fail closed until IC-022 supplies accepted reauthentication and
+single-use grants. Document workers, Copilot, Next.js, administrators, and IT
+roles receive no vault key or reveal capability.
+
