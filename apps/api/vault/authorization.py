@@ -1,14 +1,10 @@
-"""Production authorization boundary for IC-021.
+"""Untrusted request material for transaction-bound vault authorization."""
 
-IC-022 will replace this fail-closed placeholder with grant validation.
-No test credential or test-mode switch is accepted here.
-"""
+from dataclasses import dataclass
 
+@dataclass(frozen=True)
 class SensitiveAuthorization:
-    """Non-instantiable placeholder for the future grant authorization."""
+    """Carries a bounded proof and exact session key; it grants no authority itself."""
 
-    def __new__(cls, *args, **kwargs):
-        raise PermissionError("Sensitive vault authorization is unavailable")
-
-    def valid_for(self, actor_id):
-        return False
+    proof: str
+    session_key: str

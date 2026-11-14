@@ -1,11 +1,16 @@
 from collections.abc import Mapping
 
 from django.contrib.auth import authenticate, login, logout
+from django.db import transaction
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from accounts.models import User
+from vault.grants import revoke_session_grants
+from vault.models import SensitiveOperationGrant
 
 
 def identity_payload(user):
@@ -60,9 +65,14 @@ class LogoutView(APIView):
     permission_classes = []
 
     def post(self, request):
-        if active_authenticated_user(request) is None:
+        actor = active_authenticated_user(request)
+        if actor is None:
             return Response({"error": {"code": "authentication_required", "message": "Authentication required"}}, status=401)
-        logout(request._request)
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=actor.pk)
+            revoke_session_grants(user=user, session_key=request.session.session_key,
+                reason=SensitiveOperationGrant.RevocationReason.LOGOUT)
+            logout(request._request)
         return Response(status=204)
 
 

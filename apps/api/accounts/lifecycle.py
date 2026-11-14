@@ -5,6 +5,8 @@ from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event
 
 from .models import AccountDeletionReview, AdminLifecycleGuard, User
+from vault.grants import revoke_all_user_grants
+from vault.models import SensitiveOperationGrant
 
 
 class InvalidLifecycleState(Exception):
@@ -58,7 +60,7 @@ def _protect_last_admin(target, *, removing_admin):
 
 def _revoke_sessions(user_id):
     matching_ids = []
-    for session in Session.objects.all().iterator():
+    for session in Session.objects.select_for_update().order_by("session_key"):
         decoded = session.get_decoded()
         if not isinstance(decoded, dict):
             raise InvalidLifecycleState("Session data could not be decoded safely")
@@ -109,6 +111,9 @@ def deactivate_user(*, actor, target_id):
         target.lifecycle_state = User.LifecycleState.DEACTIVATED
         target.save(update_fields=("is_active", "lifecycle_state"))
         _revoke_sessions(target.pk)
+        revoke_all_user_grants(user=target,
+            reason=SensitiveOperationGrant.RevocationReason.ACCOUNT_DEACTIVATED,
+            audit_actor_id=actor.pk)
         record_critical_event(
             action=SecurityAuditEvent.Action.ACCOUNT_DEACTIVATED,
             actor_user_id=actor.pk,
