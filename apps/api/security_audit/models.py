@@ -36,8 +36,18 @@ ACTION_VALUES = (
     "vault.grant_used",
     "vault.grant_denied",
     "vault.grant_revoked",
+    "vault.maintenance_denied",
+    "vault.hold_created",
+    "vault.hold_released",
+    "vault.purge_assessed",
+    "vault.purge_executed",
+    "vault.rotation_checkpoint",
+    "vault.backup_checkpoint",
+    "vault.recovery_checked",
+    "vault.key_retirement_checked",
 )
-TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource", "vault_record")
+TARGET_TYPE_VALUES = ("account", "account_invitation", "authentication", "it_document", "private_resource",
+                      "vault_record", "vault_maintenance_operation")
 OUTCOME_VALUES = ("success", "denied", "failure")
 
 
@@ -76,6 +86,15 @@ class SecurityAuditEvent(models.Model):
         VAULT_GRANT_USED = "vault.grant_used", "Vault grant used"
         VAULT_GRANT_DENIED = "vault.grant_denied", "Vault grant denied"
         VAULT_GRANT_REVOKED = "vault.grant_revoked", "Vault grant revoked"
+        VAULT_MAINTENANCE_DENIED = "vault.maintenance_denied", "Vault maintenance authorization denied"
+        VAULT_HOLD_CREATED = "vault.hold_created", "Vault maintenance hold created"
+        VAULT_HOLD_RELEASED = "vault.hold_released", "Vault maintenance hold released"
+        VAULT_PURGE_ASSESSED = "vault.purge_assessed", "Vault purge assessed"
+        VAULT_PURGE_EXECUTED = "vault.purge_executed", "Vault purge executed"
+        VAULT_ROTATION_CHECKPOINT = "vault.rotation_checkpoint", "Vault rotation checkpoint"
+        VAULT_BACKUP_CHECKPOINT = "vault.backup_checkpoint", "Vault backup checkpoint"
+        VAULT_RECOVERY_CHECKED = "vault.recovery_checked", "Vault recovery checked"
+        VAULT_KEY_RETIREMENT_CHECKED = "vault.key_retirement_checked", "Vault key retirement checked"
 
     class TargetType(models.TextChoices):
         ACCOUNT = "account", "Account"
@@ -84,6 +103,7 @@ class SecurityAuditEvent(models.Model):
         IT_DOCUMENT = "it_document", "IT document"
         PRIVATE_RESOURCE = "private_resource", "Private resource"
         VAULT_RECORD = "vault_record", "Vault record"
+        VAULT_MAINTENANCE_OPERATION = "vault_maintenance_operation", "Vault maintenance operation"
 
     class Outcome(models.TextChoices):
         SUCCESS = "success", "Success"

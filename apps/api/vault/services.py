@@ -441,7 +441,8 @@ def create_credential(*, actor, authorization, credential_type, label, secret_fi
             try:
                 metadata = _metadata(credential_type=credential_type, label=label, service_label=service_label, origin=origin)
                 payload = _encrypted_payload(credential_type, secret_fields)
-                if VaultRecord.objects.filter(owner=owner).count() >= MAX_RECORDS_PER_OWNER:
+                if VaultRecord.objects.filter(owner=owner, lifecycle__in=(
+                        VaultRecord.Lifecycle.ACTIVE, VaultRecord.Lifecycle.DELETED)).count() >= MAX_RECORDS_PER_OWNER:
                     raise VaultConflictError("Vault record limit reached")
                 key_row, dek = _owner_key(owner)
                 record = VaultRecord(id=uuid.uuid4(), owner=owner, key_version=key_row.key_version,

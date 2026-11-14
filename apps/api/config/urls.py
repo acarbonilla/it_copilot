@@ -8,7 +8,8 @@ from documents.views import (DocumentArchiveView, DocumentCollectionView, Docume
 from session_auth.views import CsrfView, LoginView, LogoutView, MeView
 from copilot.views import ConversationCollectionView, ConversationDetailView, ConversationMessageView
 from vault.views import (VaultCredentialCollectionView, VaultCredentialDetailView, VaultCredentialRevealView,
-                         VaultCredentialRestoreView, VaultGrantRevokeView, VaultReauthenticationView)
+                         VaultCredentialRestoreView, VaultDeletedCredentialCollectionView, VaultGrantRevokeView,
+                         VaultReauthenticationView)
 
 urlpatterns = [
     path("api/v1/health", HealthView.as_view(), name="health"),
@@ -35,6 +36,8 @@ urlpatterns = [
     path("api/v1/copilot/conversations/<uuid:conversation_id>", ConversationDetailView.as_view(), name="copilot-conversation-detail"),
     path("api/v1/copilot/conversations/<uuid:conversation_id>/messages", ConversationMessageView.as_view(), name="copilot-conversation-messages"),
     path("api/v1/vault/credentials", VaultCredentialCollectionView.as_view(), name="vault-credential-list"),
+    path("api/v1/vault/deleted-credentials", VaultDeletedCredentialCollectionView.as_view(),
+         name="vault-deleted-credential-list"),
     path("api/v1/vault/reauthenticate", VaultReauthenticationView.as_view(), name="vault-reauthenticate"),
     path("api/v1/vault/grants/revoke", VaultGrantRevokeView.as_view(), name="vault-grant-revoke"),
     path("api/v1/vault/credentials/<uuid:credential_id>", VaultCredentialDetailView.as_view(), name="vault-credential-detail"),
