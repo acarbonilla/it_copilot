@@ -24,14 +24,18 @@ from vault.services import (
     reveal_credential,
     update_credential,
 )
-from vault.testing import authorize_sensitive_operation_for_test
+from vault.testing import authorize_sensitive_operation_for_test, patch_sensitive_authorization_for_test
 
+from vault.crypto import VaultCryptoError
 
 TEST_KEK = base64.b64encode(b"external-test-kek-material-32byt"[:32]).decode("ascii")
 
 
 class VaultServiceTests(TestCase):
     def setUp(self):
+        self.auth_patch = patch_sensitive_authorization_for_test()
+        self.auth_patch.start()
+        self.addCleanup(self.auth_patch.stop)
         self.env = mock.patch.dict(os.environ, {"VAULT_KEK_BASE64": TEST_KEK}, clear=False)
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -157,10 +161,96 @@ class VaultServiceTests(TestCase):
             VaultRecord.objects.filter(pk=record.pk).update(nonce=b"short")
 
 
+    def test_malformed_credential_ids_return_generic_unavailable(self):
+        invalid_ids = [
+            "not-a-uuid",
+            "",
+            "123",
+            "00000000-0000-0000-0000-invalid",
+            None,
+            12345,
+            {},
+            [],
+        ]
+
+        for invalid_id in invalid_ids:
+            with self.subTest(record_id=invalid_id):
+                with self.assertRaisesRegex(
+                    VaultUnavailableError,
+                    "^Credential is unavailable$",
+                ):
+                    get_credential_metadata(
+                        actor=self.owner,
+                        record_id=invalid_id,
+                    )
+
+                with self.assertRaisesRegex(
+                    VaultUnavailableError,
+                    "^Credential is unavailable$",
+                ):
+                    reveal_credential(
+                        actor=self.owner,
+                        authorization=self.authorization,
+                        record_id=invalid_id,
+                    )
+
+
+    def test_https_origin_canonicalization(self):
+        accepted = {
+            "https://example.com": "https://example.com",
+            "https://EXAMPLE.COM:443/": "https://example.com",
+            "https://example.com:8443": "https://example.com:8443",
+            "https://[2001:db8::1]": "https://[2001:db8::1]",
+            "https://[2001:0db8::0001]:443/": "https://[2001:db8::1]",
+            "https://[2001:db8::1]:8443": "https://[2001:db8::1]:8443",
+        }
+
+        for origin, expected in accepted.items():
+            with self.subTest(origin=origin):
+                record = self.create(
+                    label="Canonical origin",
+                    origin=origin,
+                )
+                self.assertEqual(record.origin, expected)
+
+    def test_invalid_https_origins_are_rejected(self):
+        invalid = [
+            "http://example.com",
+            "https://example.com:bad",
+            "https://example.com:99999",
+            "https://example.com:0",
+            "https://example.com:",
+            "https://2001:db8::1",
+            "https://[invalid-ipv6]",
+            "https://[2001:db8::1",
+            "https://example.com/path",
+            "https://example.com?query=1",
+            "https://example.com#fragment",
+            "https://user@example.com",
+            "https://example..com",
+            "https://-example.com",
+            "https://example.com-",
+            "https://exa_mple.com",
+            "https://example.com\\evil",
+            "https://example.com:443:8443",
+        ]
+
+        for origin in invalid:
+            with self.subTest(origin=origin):
+                with self.assertRaises(ValidationError):
+                    self.create(
+                        label="Invalid origin",
+                        origin=origin,
+                    )
+
+
 class VaultCommitBarrierTests(TransactionTestCase):
     reset_sequences = True
 
     def setUp(self):
+        self.auth_patch = patch_sensitive_authorization_for_test()
+        self.auth_patch.start()
+        self.addCleanup(self.auth_patch.stop)
         self.env = mock.patch.dict(os.environ, {"VAULT_KEK_BASE64": TEST_KEK}, clear=False)
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -175,3 +265,102 @@ class VaultCommitBarrierTests(TransactionTestCase):
             with self.assertRaises(VaultServiceUnavailable):
                 deferred.release()
         self.assertEqual(deferred.release(), {"password": "opaque-password"})
+
+
+    def test_outer_rollback_never_releases_plaintext(self):
+        deferred = None
+
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                deferred = reveal_credential(
+                    actor=self.owner,
+                    authorization=self.authorization,
+                    record_id=self.record.pk,
+                )
+
+                self.assertIsNone(deferred._payload)
+
+                raise RuntimeError("rollback marker")
+
+        self.assertIsNotNone(deferred)
+        self.assertIsNone(deferred._payload)
+
+        with self.assertRaises(VaultServiceUnavailable):
+            deferred.release()
+
+    def test_nested_rollback_never_releases_plaintext(self):
+        with transaction.atomic():
+            with self.assertRaises(RuntimeError):
+                with transaction.atomic():
+                    deferred = reveal_credential(
+                        actor=self.owner,
+                        authorization=self.authorization,
+                        record_id=self.record.pk,
+                    )
+
+                    self.assertIsNone(deferred._payload)
+
+                    raise RuntimeError("nested rollback marker")
+
+        self.assertIsNone(deferred._payload)
+
+        with self.assertRaises(VaultServiceUnavailable):
+            deferred.release()
+
+    def test_decryption_occurs_only_after_commit(self):
+        with mock.patch(
+            "vault.services._decrypt_payload",
+            wraps=__import__(
+                "vault.services",
+                fromlist=["_decrypt_payload"],
+            )._decrypt_payload,
+        ) as decrypt_mock:
+            with transaction.atomic():
+                deferred = reveal_credential(
+                    actor=self.owner,
+                    authorization=self.authorization,
+                    record_id=self.record.pk,
+                )
+
+                self.assertIsNone(deferred._payload)
+                decrypt_mock.assert_not_called()
+
+            decrypt_mock.assert_called_once()
+            self.assertEqual(
+                deferred.release(),
+                {"password": "opaque-password"},
+            )
+
+
+    def test_audit_failure_never_decrypts(self):
+        with mock.patch(
+            "vault.services._decrypt_payload"
+        ) as decrypt_mock:
+            with mock.patch(
+                "vault.services.record_critical_event",
+                side_effect=RuntimeError("audit failure"),
+            ):
+                with self.assertRaises(VaultServiceUnavailable):
+                    reveal_credential(
+                        actor=self.owner,
+                        authorization=self.authorization,
+                        record_id=self.record.pk,
+                    )
+
+            decrypt_mock.assert_not_called()
+
+    def test_post_commit_decryption_failure_denies_release(self):
+        with mock.patch(
+            "vault.services._decrypt_payload",
+            side_effect=VaultCryptoError("simulated failure"),
+        ):
+            deferred = reveal_credential(
+                actor=self.owner,
+                authorization=self.authorization,
+                record_id=self.record.pk,
+            )
+
+        self.assertIsNone(deferred._payload)
+
+        with self.assertRaises(VaultServiceUnavailable):
+            deferred.release()

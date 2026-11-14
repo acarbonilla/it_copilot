@@ -21,7 +21,7 @@ This is the single primary TTDM C4 checkpoint record. IC-021 implements the rati
 - AES-256-GCM uses fresh 96-bit nonces, 128-bit tags, and canonical AAD binding owner, record UUID, credential type, and schema. Key wrapping binds owner and key version.
 - Internal services implement create, partial update, reveal, reversible delete, restore, metadata list/detail, a 1,000-record active-plus-deleted cap, and global user-before-record/key locking. Critical state and audit writes share one transaction.
 - Reveal returns a `DeferredReveal` that rejects plaintext access until the transaction commit callback runs. Audit or commit failure therefore cannot release plaintext.
-- Metadata GET routes are authenticated and owner-scoped. Sensitive production POST/PATCH/DELETE/reveal/restore routes are explicitly disabled with a safe `503`; their internal service path is reachable only through a private in-memory test authorization seam pending IC-022.
+- Metadata GET routes are authenticated and owner-scoped. Sensitive production POST/PATCH/DELETE/reveal/restore routes are explicitly disabled with a safe `503`; Internal sensitive-service behavior is exercised through explicit test-only mocking of the authorization boundary. No production-importable test authorization issuer is provided.
 - Vault audits contain controlled action, actor snapshot, opaque record UUID, target type, outcome, and timestamp only—never secrets, labels, usernames, request bodies, envelopes, keys, or exception text.
 
 The Django API and vault code share one operating-system process identity. Python module boundaries reduce accidental access but are not OS isolation; host/process controls and careful dependency review remain required.
@@ -60,6 +60,39 @@ Executed evidence at this checkpoint:
 - `npm run validate` — PASS, structure and `.env.example` scan.
 
 The final PR head and SOL exact-head status will be appended after the implementation commit. Tests unavailable because later operations do not yet exist are reported as deferred, never as passing.
+
+
+## SOL G2 remediation checkpoint — 2026-11-14
+
+**PR:** #28
+**Original reviewed head:** `f3789ebb48f22e31f464495299803b9d5cb43efe`
+**Original SOL G2 verdict:** CHANGES REQUIRED.
+
+### Remediation status
+
+- G2-R01 HIGH: Production-deny-by-default authorization; test-only mocking.
+- G2-R02 HIGH: DeferredReveal plaintext creation only after transaction commit.
+- G2-R03 MEDIUM: Generic unavailable handling for malformed UUIDs.
+- G2-R04 MEDIUM: Strict HTTPS-origin canonicalization.
+- G2-R05 MEDIUM: Native MySQL concurrency verification at the exact 1,000-record cap.
+- G2-R06 MEDIUM: Living documentation and acceptance evidence update in progress.
+
+### Latest verification
+
+- SQLite vault suite: 39 tests; 36 passed; 3 skipped.
+- Native MySQL vault suite: 39 tests; 39 passed.
+- Native MySQL concurrency suite: 3 tests passed.
+- Migration drift: No changes detected.
+- Git whitespace check: No whitespace errors; LF-to-CRLF warnings only.
+
+### Remaining limitations
+
+- Denial-audit autocommit warnings were observed in test transactions.
+- Complete IT-role authorization coverage remains subject to G2 review.
+- IC-022 grant integration and IC-023 UI/rotation/recovery remain deferred.
+- Independent SOL G2 exact-head review is required.
+
+No commit, push, merge, or subsequent task authorization is implied.
 
 ## Outstanding dependencies
 

@@ -16,7 +16,10 @@ from accounts.models import User
 from security_audit.models import SecurityAuditEvent
 from security_audit.services import record_critical_event, record_denied_event_best_effort
 
-from .authorization import SensitiveAuthorization
+# Added by Me.
+import ipaddress
+
+# IC-021: no production grant issuer exists; IC-022 owns grant validation.
 from .crypto import (
     EncryptionContext,
     EncryptionEnvelope,
@@ -53,23 +56,31 @@ class VaultServiceUnavailable(Exception):
 
 
 @dataclass
-class DeferredReveal:
-    """Plaintext holder that cannot release until the critical transaction commits."""
 
-    _payload: dict
+@dataclass
+class DeferredReveal:
+    """Plaintext is unavailable until the critical transaction commits."""
+
+    _payload: dict | None = None
     _committed: bool = False
 
-    def _mark_committed(self):
+    def _complete(self, payload):
+        if not isinstance(payload, dict):
+            raise VaultServiceUnavailable("Vault reveal is unavailable")
+        self._payload = dict(payload)
         self._committed = True
 
     def release(self):
-        if not self._committed:
+        if not self._committed or self._payload is None:
             raise VaultServiceUnavailable("Vault reveal is unavailable")
         return dict(self._payload)
 
     def discard(self):
-        self._payload.clear()
+        if self._payload is not None:
+            self._payload.clear()
+        self._payload = None
         self._committed = False
+
 
 
 @dataclass(frozen=True)
@@ -101,10 +112,9 @@ def _active_actor(actor, *, lock=False):
 
 
 def _require_sensitive(actor, authorization):
-    actor_id = _actor_id(actor)
-    if not isinstance(authorization, SensitiveAuthorization) or not authorization.valid_for(actor_id):
-        _audit_unavailable(actor)
-        raise VaultSensitiveAuthorizationRequired("Sensitive vault operation is unavailable")
+    """IC-021 production gate: always deny until IC-022 grant validation."""
+    _audit_unavailable(actor)
+    raise VaultSensitiveAuthorizationRequired("Sensitive vault operation is unavailable")
 
 
 def _critical_audit(**event):
@@ -126,6 +136,93 @@ def _text(value, *, field, max_characters, required=True, max_utf8_bytes=None):
     return value
 
 
+def _canonical_https_origin(origin):
+    error = {"origin": "Must be a canonical HTTPS origin"}
+
+    try:
+        parsed = urlsplit(origin)
+
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+            or "?" in origin
+            or "#" in origin
+            or "\\" in origin
+        ):
+            raise ValueError("Invalid origin components")
+
+        hostname = parsed.hostname
+        port = parsed.port
+
+        if not hostname:
+            raise ValueError("Missing hostname")
+
+        if port is not None and port == 0:
+            raise ValueError("Invalid port")
+
+        if parsed.netloc.endswith(":"):
+            raise ValueError("Empty port")
+
+        if hostname.startswith("[") or hostname.endswith("]"):
+            raise ValueError("Invalid hostname")
+
+        if ":" in hostname:
+            address = ipaddress.IPv6Address(hostname)
+            host = f"[{address.compressed}]"
+
+            authority = parsed.netloc.split("]", 1)
+            if len(authority) != 2 or not authority[0].startswith("["):
+                raise ValueError("Invalid IPv6 authority")
+
+            if authority[1] not in ("", f":{port}"):
+                raise ValueError("Invalid IPv6 port")
+
+        else:
+            if not re.fullmatch(
+                r"[A-Za-z0-9.-]+",
+                hostname,
+                flags=re.ASCII,
+            ):
+                raise ValueError("Invalid hostname")
+
+            labels = hostname.split(".")
+
+            if (
+                len(hostname) > 253
+                or any(
+                    not label
+                    or len(label) > 63
+                    or label.startswith("-")
+                    or label.endswith("-")
+                    for label in labels
+                )
+            ):
+                raise ValueError("Invalid hostname")
+
+            host = hostname.lower()
+
+            if parsed.netloc.lower() not in (
+                hostname.lower(),
+                f"{hostname.lower()}:{port}",
+            ):
+                raise ValueError("Invalid authority")
+
+        normalized = f"https://{host}"
+
+        if port is not None and port != 443:
+            normalized += f":{port}"
+
+        return normalized
+
+    except (ValueError, TypeError, AttributeError):
+        raise ValidationError(error) from None
+
+
 def _metadata(*, credential_type, label, service_label="", origin=""):
     allowed = {choice.value for choice in VaultRecord.CredentialType}
     if credential_type not in allowed:
@@ -143,16 +240,12 @@ def _metadata(*, credential_type, label, service_label="", origin=""):
         raise ValidationError({"origin": "Field is not available for this credential type"})
     normalized_origin = ""
     if origin:
-        origin = _text(origin, field="origin", max_characters=2048)
-        parsed = urlsplit(origin)
-        try:
-            port = parsed.port
-        except ValueError as exc:
-            raise ValidationError({"origin": "Must be a canonical HTTPS origin"}) from exc
-        if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
-            raise ValidationError({"origin": "Must be a canonical HTTPS origin"})
-        host = parsed.hostname.lower()
-        normalized_origin = f"https://{host}" + (f":{port}" if port and port != 443 else "")
+        origin = _text(
+            origin,
+            field="origin",
+            max_characters=2048,
+        )
+        normalized_origin = _canonical_https_origin(origin)
     return {
         "credential_type": credential_type,
         "label": _text(label, field="label", max_characters=120),
@@ -362,23 +455,45 @@ def create_credential(*, actor, authorization, credential_type, label, secret_fi
         raise VaultServiceUnavailable("Vault operation could not be completed") from exc
 
 
+
 def _locked_record(actor, record_id, *, include_deleted=False, lock_owner_keys=False):
     owner = _active_actor(actor, lock=True)
+
     if owner is None:
         raise VaultUnavailableError("Credential is unavailable")
+
     key_rows = []
+
     if lock_owner_keys:
-        key_rows = list(VaultOwnerKey.objects.select_for_update().filter(owner=owner).order_by("key_version"))
-    queryset = VaultRecord.objects.select_for_update().filter(pk=record_id, owner=owner)
-    if not include_deleted:
-        queryset = queryset.filter(lifecycle=VaultRecord.Lifecycle.ACTIVE)
+        key_rows = list(
+            VaultOwnerKey.objects.select_for_update()
+            .filter(owner=owner)
+            .order_by("key_version")
+        )
+
     try:
+        normalized_id = uuid.UUID(str(record_id))
+
+        queryset = VaultRecord.objects.select_for_update().filter(
+            pk=normalized_id,
+            owner=owner,
+        )
+
+        if not include_deleted:
+            queryset = queryset.filter(
+                lifecycle=VaultRecord.Lifecycle.ACTIVE
+            )
+
         record = queryset.first()
-    except (ValidationError, ValueError, TypeError):
+
+    except (ValidationError, ValueError, TypeError, AttributeError):
         record = None
+
     if record is None:
         raise VaultUnavailableError("Credential is unavailable")
+
     return owner, key_rows, record
+
 
 
 def update_credential(*, actor, authorization, record_id, expected_revision, metadata_changes=None, secret_fields=None):
@@ -434,14 +549,24 @@ def update_credential(*, actor, authorization, record_id, expected_revision, met
         raise VaultServiceUnavailable("Vault operation could not be completed") from exc
 
 
+
 def reveal_credential(*, actor, authorization, record_id):
     _require_sensitive(actor, authorization)
-    deferred = None
+    deferred = DeferredReveal()
+
     try:
         with transaction.atomic():
-            owner, key_rows, record = _locked_record(actor, record_id, lock_owner_keys=True)
-            dek = _unwrap_key_row(owner, _key_by_version(key_rows, record.key_version))
-            deferred = DeferredReveal(_decrypt_payload(record, dek))
+            owner, key_rows, record = _locked_record(
+                actor,
+                record_id,
+                lock_owner_keys=True,
+            )
+
+            dek = _unwrap_key_row(
+                owner,
+                _key_by_version(key_rows, record.key_version),
+            )
+
             _critical_audit(
                 action=SecurityAuditEvent.Action.VAULT_REVEALED,
                 actor_user_id=owner.pk,
@@ -449,12 +574,28 @@ def reveal_credential(*, actor, authorization, record_id):
                 target_id=str(record.pk),
                 outcome=SecurityAuditEvent.Outcome.SUCCESS,
             )
-            transaction.on_commit(deferred._mark_committed)
+
+            def complete_after_commit():
+                try:
+                    payload = _decrypt_payload(record, dek)
+                    deferred._complete(payload)
+                except Exception:
+                    deferred.discard()
+
+            transaction.on_commit(complete_after_commit)
+
         return deferred
-    except (VaultCryptoError, DatabaseError) as exc:
-        if deferred is not None:
-            deferred.discard()
-        raise VaultServiceUnavailable("Vault operation could not be completed") from exc
+
+    except (VaultCryptoError, DatabaseError):
+        deferred.discard()
+        raise VaultServiceUnavailable(
+            "Vault operation could not be completed"
+        ) from None
+
+    except Exception:
+        deferred.discard()
+        raise
+
 
 
 def delete_credential(*, actor, authorization, record_id, expected_revision):
