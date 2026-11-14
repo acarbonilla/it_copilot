@@ -4,7 +4,7 @@ from django.test import SimpleTestCase
 
 from vault.authorization import SensitiveAuthorization
 from vault.services import VaultSensitiveAuthorizationRequired, _require_sensitive
-from vault.testing import (
+from vault.tests.testing import (
     authorize_sensitive_operation_for_test,
     patch_sensitive_authorization_for_test,
 )
@@ -59,3 +59,8 @@ class VaultAuthorizationIsolationTests(SimpleTestCase):
                     authorize_sensitive_operation_for_test(
                         type("Actor", (), {"pk": actor_id})()
                     )
+
+
+    def test_production_testing_module_is_not_importable(self):
+        import importlib.util
+        self.assertIsNone(importlib.util.find_spec('vault.testing'))

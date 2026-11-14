@@ -24,7 +24,7 @@ from vault.services import (
     reveal_credential,
     update_credential,
 )
-from vault.testing import authorize_sensitive_operation_for_test, patch_sensitive_authorization_for_test
+from vault.tests.testing import authorize_sensitive_operation_for_test, patch_sensitive_authorization_for_test
 
 from vault.crypto import VaultCryptoError
 

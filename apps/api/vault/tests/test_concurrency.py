@@ -10,7 +10,7 @@ from django.test import TransactionTestCase
 from accounts.models import User
 from vault.models import VaultRecord
 from vault.services import VaultConflictError, create_credential, update_credential
-from vault.testing import authorize_sensitive_operation_for_test, patch_sensitive_authorization_for_test
+from vault.tests.testing import authorize_sensitive_operation_for_test, patch_sensitive_authorization_for_test
 
 import uuid
 
