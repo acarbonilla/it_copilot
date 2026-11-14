@@ -1,6 +1,7 @@
 import base64
 import os
 import uuid
+from datetime import timedelta
 from unittest import mock
 
 from django.core.exceptions import ValidationError
@@ -85,6 +86,33 @@ class VaultServiceTests(TestCase):
         VaultRecord.objects.filter(pk=record.pk).update(restore_expires_at=timezone.now())
         with self.assertRaises(VaultConflictError):
             restore_credential(actor=self.owner, authorization=self.authorization, record_id=record.pk, expected_revision=2)
+
+    def test_restore_then_redelete_starts_a_fresh_thirty_day_window(self):
+        record = self.create()
+        first = delete_credential(actor=self.owner, authorization=self.authorization,
+                                  record_id=record.pk, expected_revision=1)
+        first_expiry = first.restore_expires_at
+        restored = restore_credential(actor=self.owner, authorization=self.authorization,
+                                      record_id=record.pk, expected_revision=2)
+        self.assertIsNone(restored.deleted_at)
+        self.assertIsNone(restored.restore_expires_at)
+        with mock.patch("vault.services.timezone.now", return_value=first_expiry + timedelta(hours=1)):
+            second = delete_credential(actor=self.owner, authorization=self.authorization,
+                                       record_id=record.pk, expected_revision=3)
+        self.assertGreater(second.restore_expires_at, first_expiry)
+
+    def test_purged_tombstone_cannot_be_restored(self):
+        record = self.create()
+        deleted = delete_credential(actor=self.owner, authorization=self.authorization,
+                                    record_id=record.pk, expected_revision=1)
+        VaultRecord.objects.filter(pk=record.pk).update(
+            lifecycle=VaultRecord.Lifecycle.PURGED, label=None, service_label=None, origin=None,
+            schema_version=None, envelope_version=None, key_version=None, nonce=None, ciphertext=None, tag=None,
+            purged_at=timezone.now(), purge_operation_id=uuid.uuid4(),
+        )
+        with self.assertRaises(VaultConflictError):
+            restore_credential(actor=self.owner, authorization=self.authorization,
+                               record_id=record.pk, expected_revision=deleted.revision)
 
     def test_cross_owner_admin_superuser_and_missing_targets_share_unavailable(self):
         record = self.create()

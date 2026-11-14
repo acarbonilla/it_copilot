@@ -3,6 +3,7 @@ import re
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import DatabaseError, transaction
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
 from rest_framework.response import Response
@@ -13,6 +14,7 @@ from accounts.models import User
 
 from .authorization import SensitiveAuthorization
 from .grants import GrantDenied, ReauthenticationDenied, audit_invalid_grant, issue_grant, revoke_session_grants
+from .lifecycle import deleted_metadata_payload, list_deleted_credentials
 from .models import SensitiveOperationGrant
 from .services import (
     VaultConflictError, VaultSensitiveAuthorizationRequired, VaultServiceUnavailable, VaultUnavailableError,
@@ -99,6 +101,29 @@ class VaultGrantRevokeView(APIView):
         except Exception:
             return _error("service_unavailable", "Vault operation could not be completed", 503)
         return Response(status=204)
+
+
+class VaultDeletedCredentialCollectionView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        user = _identity(request)
+        if user is None:
+            return _error("authentication_required", "Authentication required", 401)
+        try:
+            limit = int(request.query_params.get("limit", "25"))
+            page = list_deleted_credentials(actor=user, cursor=request.query_params.get("cursor"), limit=limit)
+        except (ValueError, ValidationError):
+            return _error("invalid_request", "Request is invalid", 400)
+        now = timezone.now()
+        response = Response({
+            "credentials": [deleted_metadata_payload(record, now=now) for record in page.records],
+            "nextCursor": page.next_cursor,
+        })
+        response["Cache-Control"] = "no-store, private"
+        response["Pragma"] = "no-cache"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 @method_decorator(csrf_protect, name="dispatch")
