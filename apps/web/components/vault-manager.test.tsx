@@ -117,4 +117,94 @@ describe("VaultManager", () => {
     expect(await screen.findByText(/Authorization expired or was already used/)).toBeVisible();
     expect(remove).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["visibilitychange", "pagehide"] as const)("clears editor secrets on %s and does not restore them", async eventName => {
+    render(<VaultManager />);
+    await userEvent.click(await screen.findByRole("button", { name: "Add credential" }));
+    await userEvent.type(screen.getByLabelText("Password"), "editor-secret");
+    if (eventName === "visibilitychange") {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      fireEvent(document, new Event("visibilitychange"));
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    } else {
+      fireEvent(window, new Event("pagehide"));
+    }
+    expect(screen.queryByRole("dialog", { name: "Add credential" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add credential" }));
+    expect(screen.getByLabelText("Password")).toHaveValue("");
+  });
+
+  it("clears editor secrets when creation is cancelled", async () => {
+    render(<VaultManager />);
+    await userEvent.click(await screen.findByRole("button", { name: "Add credential" }));
+    await userEvent.type(screen.getByLabelText("Password"), "cancelled-secret");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add credential" }));
+    expect(screen.getByLabelText("Password")).toHaveValue("");
+  });
+
+  it("does not restore editor secrets after component unmount", async () => {
+    const first = render(<VaultManager />);
+    await userEvent.click(await screen.findByRole("button", { name: "Add credential" }));
+    await userEvent.type(screen.getByLabelText("Password"), "unmounted-secret");
+    first.unmount();
+    render(<VaultManager />);
+    await userEvent.click(await screen.findByRole("button", { name: "Add credential" }));
+    expect(screen.getByLabelText("Password")).toHaveValue("");
+  });
+
+  it.each([
+    { type: "API_TOKEN", secretLabel: "Token", secret: "token-value", serviceExpected: true },
+    { type: "SSH_KEY", secretLabel: "Private key", secret: "private-key-value", serviceExpected: false },
+    { type: "GENERIC_SECRET", secretLabel: "Secret", secret: "generic-value", serviceExpected: false },
+  ] as const)("omits incompatible LOGIN metadata after switching to $type", async ({ type, secretLabel, secret, serviceExpected }) => {
+    vi.spyOn(api, "reauthenticateVault").mockResolvedValue({ grant: "grant", expiresAt: "2026-11-15T01:00:00Z" });
+    const create = vi.spyOn(api, "createVaultCredential").mockResolvedValue({ ...active, credential_type: type });
+    render(<VaultManager />);
+    await userEvent.click(await screen.findByRole("button", { name: "Add credential" }));
+    await userEvent.type(screen.getByLabelText("Label"), "Changed type");
+    await userEvent.type(screen.getByLabelText("Service label"), "Supported service");
+    await userEvent.type(screen.getByLabelText("HTTPS origin"), "https://stale.example.test");
+    await userEvent.selectOptions(screen.getAllByLabelText("Type").at(-1)!, type);
+    await userEvent.type(screen.getByLabelText(secretLabel), secret);
+    await userEvent.click(screen.getByRole("button", { name: "Continue to reauthentication" }));
+    await userEvent.type(screen.getByLabelText("Password"), "account-password");
+    await userEvent.click(screen.getByRole("button", { name: "Authorize once" }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    const input = create.mock.calls[0][0];
+    expect(input).not.toHaveProperty("origin");
+    if (serviceExpected) expect(input).toHaveProperty("serviceLabel", "Supported service");
+    else expect(input).not.toHaveProperty("serviceLabel");
+  });
+
+  it("blocks rapid duplicate Next transitions while the page request is pending", async () => {
+    let finish!: (value: api.VaultPage<api.VaultCredential>) => void;
+    vi.mocked(api.listVaultCredentials)
+      .mockResolvedValueOnce({ credentials: [active], nextCursor: "cursor-2" })
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    render(<VaultManager />);
+    const next = await screen.findByRole("button", { name: "Next" });
+    await waitFor(() => expect(next).toBeEnabled());
+    fireEvent.click(next); fireEvent.click(next); fireEvent.click(next);
+    expect(next).toBeDisabled();
+    await waitFor(() => expect(api.listVaultCredentials).toHaveBeenCalledTimes(2));
+    expect(api.listVaultCredentials).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "cursor-2" }));
+    expect(screen.getByText("Page 2")).toBeVisible();
+    finish({ credentials: [active], nextCursor: null });
+    await waitFor(() => expect(next).toBeDisabled());
+    expect(screen.getByText("Page 2")).toBeVisible();
+  });
+
+  it("shows an initialization error without metadata and recovers on retry", async () => {
+    vi.mocked(api.currentUser)
+      .mockRejectedValueOnce(new api.ApiError(503, "service_unavailable", "Service unavailable"))
+      .mockResolvedValueOnce(member);
+    render(<VaultManager />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Service unavailable");
+    expect(screen.queryByText("Portal")).not.toBeInTheDocument();
+    expect(api.listVaultCredentials).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Portal")).toBeVisible();
+    expect(api.currentUser).toHaveBeenCalledTimes(2);
+  });
 });

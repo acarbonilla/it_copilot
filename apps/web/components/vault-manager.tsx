@@ -59,7 +59,9 @@ function typeLabel(type: VaultCredentialType) {
 
 export function VaultManager() {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const [initialization, setInitialization] = useState<"loading" | "ready" | "error">("loading");
+  const [initializationError, setInitializationError] = useState("");
+  const [initializationAttempt, setInitializationAttempt] = useState(0);
   const [tab, setTab] = useState<"active" | "deleted">("active");
   const [active, setActive] = useState<VaultCredential[]>([]);
   const [deleted, setDeleted] = useState<DeletedVaultCredential[]>([]);
@@ -78,6 +80,7 @@ export function VaultManager() {
   const [listError, setListError] = useState("");
   const generation = useRef(0);
   const listGeneration = useRef(0);
+  const paginationInFlight = useRef(false);
   const authorizationInFlight = useRef(false);
   const revealTimer = useRef<number | null>(null);
   const copiedValues = useRef(new Set<string>());
@@ -89,6 +92,7 @@ export function VaultManager() {
     setRevealed(null);
     setShowPlaintext(false);
     setPending(null);
+    setEditor(null);
     if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
     revealTimer.current = null;
     copiedValues.current.forEach(value => { void clearClipboardIfUnchanged(value); });
@@ -122,21 +126,37 @@ export function VaultManager() {
       setListError(friendlyError(error));
       if (error instanceof ApiError && error.status === 401) router.replace("/login");
     } finally {
-      if (marker === listGeneration.current) setListLoading(false);
+      if (marker === listGeneration.current) {
+        paginationInFlight.current = false;
+        setListLoading(false);
+      }
     }
   }, [cursor, filterType, prefix, router, tab]);
 
   useEffect(() => {
     let cancelled = false;
-    currentUser().then(() => { if (!cancelled) setReady(true); }).catch(handleError);
+    currentUser().then(() => {
+      if (!cancelled) {
+        setInitializationError("");
+        setInitialization("ready");
+      }
+    }).catch(error => {
+      if (cancelled) return;
+      if (error instanceof ApiError && error.status === 401) {
+        handleError(error);
+        return;
+      }
+      setInitializationError(friendlyError(error));
+      setInitialization("error");
+    });
     return () => { cancelled = true; clearSensitive(); };
-  }, [clearSensitive, handleError]);
+  }, [clearSensitive, handleError, initializationAttempt]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (initialization !== "ready") return;
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => { window.clearTimeout(timer); listGeneration.current += 1; };
-  }, [ready, load]);
+  }, [initialization, load]);
 
   useEffect(() => {
     function hide() { if (document.visibilityState !== "visible") clearSensitive(); }
@@ -149,6 +169,23 @@ export function VaultManager() {
   function switchTab(next: "active" | "deleted") {
     clearSensitive();
     setTab(next); setCursor(undefined); setCursorHistory([]); setNextCursor(null); setMessage("");
+  }
+
+  function nextPage() {
+    if (listLoading || paginationInFlight.current || !nextCursor) return;
+    paginationInFlight.current = true;
+    setListLoading(true);
+    setCursorHistory(history => [...history, cursor]);
+    setCursor(nextCursor);
+  }
+
+  function previousPage() {
+    if (listLoading || paginationInFlight.current || !cursorHistory.length) return;
+    paginationInFlight.current = true;
+    setListLoading(true);
+    const history = [...cursorHistory];
+    setCursor(history.pop());
+    setCursorHistory(history);
   }
 
   function requireGrant(action: PendingAction) {
@@ -176,7 +213,8 @@ export function VaultManager() {
     } catch { setMessage("Clipboard access was denied. Select and copy the value manually."); }
   }
 
-  if (!ready) return <main className="grid min-h-screen place-items-center"><p role="status">Loading your vault…</p></main>;
+  if (initialization === "loading") return <main className="grid min-h-screen place-items-center"><p role="status">Loading your vault…</p></main>;
+  if (initialization === "error") return <main className="grid min-h-screen place-items-center p-6"><div role="alert" className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-red-900"><h1 className="text-xl font-semibold">Unable to open your vault</h1><p className="mt-2 text-sm">{initializationError}</p><Button className="mt-4" onClick={() => { setInitialization("loading"); setInitializationError(""); setInitializationAttempt(value => value + 1); }}>Try again</Button></div></main>;
 
   return <main className="mx-auto max-w-6xl p-6 lg:p-10">
     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -210,7 +248,7 @@ export function VaultManager() {
       {!listLoading && !listError && !(tab === "active" ? active : deleted).length && <p className="py-12 text-center text-slate-600">No {tab} credentials found.</p>}
     </section>
 
-    <nav aria-label="Vault pagination" className="mt-6 flex items-center justify-between"><Button variant="outline" disabled={!cursorHistory.length} onClick={() => { const history = [...cursorHistory]; setCursor(history.pop()); setCursorHistory(history); }}>Previous</Button><span className="text-sm text-slate-600">Page {cursorHistory.length + 1}</span><Button variant="outline" disabled={!nextCursor} onClick={() => { setCursorHistory(history => [...history, cursor]); setCursor(nextCursor ?? undefined); }}>Next</Button></nav>
+    <nav aria-label="Vault pagination" className="mt-6 flex items-center justify-between"><Button variant="outline" disabled={listLoading || !cursorHistory.length} onClick={previousPage}>Previous</Button><span className="text-sm text-slate-600">Page {cursorHistory.length + 1}</span><Button variant="outline" disabled={listLoading || !nextCursor} onClick={nextPage}>Next</Button></nav>
 
     {editor && <CredentialEditor state={editor} busy={busy} onClose={() => setEditor(null)} onSubmit={(input, item) => {
       if (item) requireGrant({ kind: "mutation", title: `Update ${item.label}`, run: grant => updateVaultCredential(item, input as VaultUpdateInput, grant), success: "Credential updated.", closeEditor: true });
@@ -266,7 +304,24 @@ function CredentialEditor({ state, busy, onClose, onSubmit }: { state: EditorSta
   const item = state.mode === "edit" ? state.item : undefined;
   const [type, setType] = useState<VaultCredentialType>(state.mode === "create" ? state.type : state.item.credential_type);
   const [label, setLabel] = useState(item?.label ?? ""); const [service, setService] = useState(item?.service_label ?? ""); const [origin, setOrigin] = useState(item?.origin ?? ""); const [secrets, setSecrets] = useState<VaultSecretFields>({});
-  function submit(event: FormEvent) { event.preventDefault(); const secretFields = Object.fromEntries(Object.entries(secrets).filter(([, value]) => value !== "")); if (item) onSubmit({ metadata: { label, service_label: service, origin }, ...(Object.keys(secretFields).length ? { secretFields } : {}) }, item); else onSubmit({ credentialType: type, label, serviceLabel: service, origin, secretFields } as VaultCredentialInput); }
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (type !== "LOGIN") setOrigin("");
+      if (type !== "LOGIN" && type !== "API_TOKEN") setService("");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [type]);
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const secretFields = Object.fromEntries(Object.entries(secrets).filter(([, value]) => value !== ""));
+    if (item) {
+      const metadata = type === "LOGIN" ? { label, service_label: service, origin } : type === "API_TOKEN" ? { label, service_label: service } : { label };
+      onSubmit({ metadata, ...(Object.keys(secretFields).length ? { secretFields } : {}) }, item);
+    } else {
+      const metadata = type === "LOGIN" ? { serviceLabel: service, origin } : type === "API_TOKEN" ? { serviceLabel: service } : {};
+      onSubmit({ credentialType: type, label, ...metadata, secretFields });
+    }
+  }
   return <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-slate-950/60 p-4"><form role="dialog" aria-modal="true" aria-labelledby="editor-title" onSubmit={submit} className="my-8 w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl"><div className="flex justify-between"><div><h2 id="editor-title" className="text-xl font-semibold">{item ? "Edit credential" : "Add credential"}</h2><p className="mt-1 text-sm text-slate-600">{item ? "Leave secret fields blank to keep their current values." : "All secret values are encrypted by the vault service."}</p></div><Button type="button" variant="ghost" aria-label="Close" onClick={onClose}><X /></Button></div><div className="mt-5 grid gap-4 md:grid-cols-2"><label className="text-sm font-medium">Type<select disabled={!!item} value={type} onChange={e => { setType(e.target.value as VaultCredentialType); setSecrets({}); }} className="mt-1 w-full rounded-md border p-2.5">{credentialTypes.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select></label><label className="text-sm font-medium">Label<Input required maxLength={120} value={label} onChange={e => setLabel(e.target.value)} className="mt-1" /></label>{(type === "LOGIN" || type === "API_TOKEN") && <label className="text-sm font-medium">Service label<Input maxLength={120} value={service} onChange={e => setService(e.target.value)} className="mt-1" /></label>}{type === "LOGIN" && <label className="text-sm font-medium">HTTPS origin<Input type="url" placeholder="https://example.com" value={origin} onChange={e => setOrigin(e.target.value)} className="mt-1" /></label>}{secretContracts[type].map(field => <label key={field.name} className={`text-sm font-medium ${field.multiline ? "md:col-span-2" : ""}`}>{field.label}{field.multiline ? <textarea required={!item && field.required} maxLength={field.name === "private_key" ? 65536 : field.name === "notes" ? 8192 : 32768} value={secrets[field.name] ?? ""} onChange={e => setSecrets(value => ({ ...value, [field.name]: e.target.value }))} className="mt-1 min-h-24 w-full rounded-md border p-2" /> : <Input required={!item && field.required} type={["password", "passphrase", "secret", "token"].includes(field.name) ? "password" : "text"} value={secrets[field.name] ?? ""} onChange={e => setSecrets(value => ({ ...value, [field.name]: e.target.value }))} className="mt-1" />}</label>)}</div><div className="mt-6 flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy}>{item ? "Continue to reauthentication" : "Continue to reauthentication"}</Button></div></form></div>;
 }
 
