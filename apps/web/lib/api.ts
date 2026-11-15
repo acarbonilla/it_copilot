@@ -100,6 +100,92 @@ export async function documentAction(item: DocumentItem, action: "archive" | "re
 export async function retryDocument(item: DocumentItem): Promise<void> { if (!item.processing) throw new ApiError(409, "conflict", "Document has no retryable version"); await unsafeRequest(`/api/v1/documents/${item.id}/retry`, { expected_revision: item.metadata_revision, version_id: item.processing.version_id }); }
 export function documentDownloadUrl(id: string): string { return `${API_BASE_URL}/api/v1/documents/${id}/download`; }
 
+export type VaultCredentialType = "LOGIN" | "API_TOKEN" | "SSH_KEY" | "GENERIC_SECRET";
+export type VaultCredential = {
+  id: string;
+  credential_type: VaultCredentialType;
+  label: string;
+  service_label: string;
+  origin: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+};
+export type DeletedVaultCredential = Pick<VaultCredential, "id" | "credential_type" | "label" | "service_label" | "origin" | "revision"> & {
+  restorationEligible: boolean;
+  restorationExpiresAt: string;
+};
+export type VaultPage<T> = { credentials: T[]; nextCursor: string | null };
+export type VaultSecretFields = Record<string, string>;
+export type VaultCredentialInput = {
+  credentialType: VaultCredentialType;
+  label: string;
+  serviceLabel?: string;
+  origin?: string;
+  secretFields: VaultSecretFields;
+};
+
+/*
+ * Sensitive vault mutations deliberately use a separate, single-attempt path.
+ * A CSRF token may be bootstrapped before the mutation, but the mutation itself
+ * is never replayed: a grant is single-use even when the business action fails.
+ */
+async function vaultSensitiveRequest<T>(path: string, grant: string, body?: object, method = "POST"): Promise<T> {
+  const token = csrfToken ?? await bootstrapCsrf();
+  return request<T>(path, {
+    method,
+    headers: { "Content-Type": "application/json", "X-CSRFToken": token, "X-Vault-Grant": grant },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+export async function listVaultCredentials(filters: { cursor?: string; type?: VaultCredentialType | ""; prefix?: string; limit?: number } = {}): Promise<VaultPage<VaultCredential>> {
+  const query = new URLSearchParams({ limit: String(filters.limit ?? 25) });
+  if (filters.cursor) query.set("cursor", filters.cursor);
+  if (filters.type) query.set("type", filters.type);
+  if (filters.prefix) query.set("prefix", filters.prefix);
+  return request(`/api/v1/vault/credentials?${query}`);
+}
+
+export async function listDeletedVaultCredentials(cursor?: string, limit = 25): Promise<VaultPage<DeletedVaultCredential>> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (cursor) query.set("cursor", cursor);
+  return request(`/api/v1/vault/deleted-credentials?${query}`);
+}
+
+export async function reauthenticateVault(password: string): Promise<{ grant: string; expiresAt: string }> {
+  const token = await bootstrapCsrf();
+  return request("/api/v1/vault/reauthenticate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": token },
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function createVaultCredential(input: VaultCredentialInput, grant: string): Promise<VaultCredential> {
+  return (await vaultSensitiveRequest<{ credential: VaultCredential }>("/api/v1/vault/credentials", grant, input)).credential;
+}
+
+export async function updateVaultCredential(item: VaultCredential, changes: { metadata: { label: string; service_label?: string; origin?: string }; secretFields?: VaultSecretFields }, grant: string): Promise<VaultCredential> {
+  return (await vaultSensitiveRequest<{ credential: VaultCredential }>(`/api/v1/vault/credentials/${encodeURIComponent(item.id)}`, grant, {
+    expectedRevision: item.revision,
+    metadata: changes.metadata,
+    ...(changes.secretFields ? { secretFields: changes.secretFields } : {}),
+  }, "PATCH")).credential;
+}
+
+export async function revealVaultCredential(id: string, grant: string): Promise<VaultSecretFields> {
+  return (await vaultSensitiveRequest<{ credential: { id: string; revealed: VaultSecretFields } }>(`/api/v1/vault/credentials/${encodeURIComponent(id)}/reveal`, grant)).credential.revealed;
+}
+
+export async function deleteVaultCredential(item: VaultCredential, grant: string): Promise<void> {
+  await vaultSensitiveRequest(`/api/v1/vault/credentials/${encodeURIComponent(item.id)}`, grant, { expectedRevision: item.revision }, "DELETE");
+}
+
+export async function restoreVaultCredential(item: DeletedVaultCredential, grant: string): Promise<VaultCredential> {
+  return (await vaultSensitiveRequest<{ credential: VaultCredential }>(`/api/v1/vault/credentials/${encodeURIComponent(item.id)}/restore`, grant, { expectedRevision: item.revision })).credential;
+}
+
 export type CopilotCitation = { id: string; document_id: string; version_id: string; label: string; version_sequence: number };
 export type CopilotMessage = { id: string; role: "user" | "assistant"; content: string; grounding_status: "not_applicable" | "references" | "insufficient"; provider_status: "not_applicable" | "disabled" | "unavailable"; citations: CopilotCitation[]; created_at: string };
 export type CopilotConversation = { id: string; title: string; created_at: string; updated_at: string; last_activity_at: string; retention_expires_at: string };
