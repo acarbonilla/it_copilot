@@ -73,8 +73,11 @@ class KeyRotationTests(TestCase):
     def test_kek_rewrap_preserves_dek_record_version_and_ciphertext(self):
         key_row, dek = self._key(); record = self._record(key_row, dek)
         old_nonce, old_wrapped, old_ciphertext = bytes(key_row.nonce), bytes(key_row.wrapped_dek), bytes(record.ciphertext)
-        dry = assess_kek_rotation(principal=self.executor, source_generation=1, target_generation=2)
-        operation, _ = prepare_rotation(principal=self.executor, confirming_principal=self.confirmer, dry_run=dry)
+        dry = assess_kek_rotation(principal=self.executor, owner_id=self.owner.pk,
+                                  source_generation=1, target_generation=2)
+        operation, _ = prepare_rotation(principal=self.executor, confirming_principal=self.confirmer, dry_run=dry,
+                                        owner_id=self.owner.pk, source_generation=1, target_generation=2)
+        self.assertEqual(operation.journal.owner_id, self.owner.pk)
         _execute_disposable_kek_rotation(principal=self.executor, operation_id=operation.pk,
                                          source_generation=1, target_generation=2)
         key_row.refresh_from_db(); record.refresh_from_db()
@@ -85,13 +88,18 @@ class KeyRotationTests(TestCase):
             bytes(key_row.wrapped_dek), bytes(key_row.tag)), owner_id=self.owner.pk)
         self.assertEqual(recovered, dek); self.assertEqual(record.key_version, 1)
         self.assertEqual(bytes(record.ciphertext), old_ciphertext)
+        journal = operation.journal; journal.refresh_from_db()
+        self.assertEqual((journal.owner_id, journal.old_key_version, journal.new_key_version),
+                         (self.owner.pk, 1, 2))
 
     def test_dek_rotation_reencrypts_active_and_deleted_atomically(self):
         key_row, old_dek = self._key(); active = self._record(key_row, old_dek)
         deleted = self._record(key_row, old_dek, lifecycle=VaultRecord.Lifecycle.DELETED, label="deleted")
         old = {active.pk: (active.revision, bytes(active.nonce)), deleted.pk: (deleted.revision, bytes(deleted.nonce))}
         dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
-        operation, _ = prepare_rotation(principal=self.executor, confirming_principal=self.confirmer, dry_run=dry)
+        operation, _ = prepare_rotation(principal=self.executor, confirming_principal=self.confirmer, dry_run=dry,
+                                        owner_id=self.owner.pk)
+        self.assertEqual(operation.journal.owner_id, self.owner.pk)
         _execute_disposable_dek_rotation(principal=self.executor, operation_id=operation.pk, owner_id=self.owner.pk)
         key_row.refresh_from_db(); active.refresh_from_db(); deleted.refresh_from_db()
         new_key = VaultOwnerKey.objects.get(owner=self.owner, active_slot=True)
@@ -107,11 +115,15 @@ class KeyRotationTests(TestCase):
                 bytes(record.ciphertext), bytes(record.tag)), context=EncryptionContext(
                     self.owner.pk, str(record.pk), record.credential_type))
             self.assertEqual(plaintext, b'{"secret":"value"}')
+        journal = operation.journal; journal.refresh_from_db()
+        self.assertEqual((journal.owner_id, journal.old_key_version, journal.new_key_version),
+                         (self.owner.pk, 1, 2))
 
     def test_failure_rolls_back_without_mixed_key_state(self):
         key_row, dek = self._key(); record = self._record(key_row, dek)
         dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
-        operation, _ = prepare_rotation(principal=self.executor, confirming_principal=self.confirmer, dry_run=dry)
+        operation, _ = prepare_rotation(principal=self.executor, confirming_principal=self.confirmer, dry_run=dry,
+                                        owner_id=self.owner.pk)
         with mock.patch("vault.rotation.encrypt", side_effect=RuntimeError("disposable failure")):
             with self.assertRaises(RuntimeError):
                 _execute_disposable_dek_rotation(principal=self.executor, operation_id=operation.pk,
@@ -126,7 +138,8 @@ class KeyRotationTests(TestCase):
         with self.assertRaises(RotationDenied): assess_dek_rotation(principal=wrong, owner_id=self.owner.pk)
         dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
         with self.assertRaises(RotationDenied):
-            prepare_rotation(principal=self.executor, confirming_principal=self.executor, dry_run=dry)
+            prepare_rotation(principal=self.executor, confirming_principal=self.executor, dry_run=dry,
+                             owner_id=self.owner.pk)
         with self.assertRaises(OperationalRotationDisabled): execute_kek_rotation()
         with self.assertRaises(OperationalRotationDisabled): execute_dek_rotation()
 
@@ -134,7 +147,7 @@ class KeyRotationTests(TestCase):
         key_row, dek = self._key(); self._record(key_row, dek)
         dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
         operation, confirmation = prepare_rotation(
-            principal=self.executor, confirming_principal=self.confirmer, dry_run=dry)
+            principal=self.executor, confirming_principal=self.confirmer, dry_run=dry, owner_id=self.owner.pk)
         confirmation.parameter_digest = "0" * 64; confirmation.save(update_fields=("parameter_digest",))
         with self.assertRaises(RotationDenied):
             _execute_disposable_dek_rotation(principal=self.executor, operation_id=operation.pk,
@@ -179,7 +192,66 @@ class KeyRotationTests(TestCase):
         document["generations"] = [document["generations"][1]]
         self.provider.write_text(json.dumps(document), encoding="utf-8")
         with self.assertRaises(Exception): assess_kek_rotation(
-            principal=self.executor, source_generation=1, target_generation=2)
+            principal=self.executor, owner_id=self.owner.pk, source_generation=1, target_generation=2)
+
+    def test_pending_owner_scope_blocks_overlap_and_retirement_but_not_unrelated_owner(self):
+        key_row, dek = self._key(); self._record(key_row, dek)
+        first_dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
+        second_dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
+        operation, _ = prepare_rotation(principal=self.executor, confirming_principal=self.confirmer,
+                                        dry_run=first_dry, owner_id=self.owner.pk)
+        journal = operation.journal; journal.refresh_from_db()
+        self.assertEqual(journal.owner_id, self.owner.pk)
+        self.assertEqual(journal.state, journal.State.PENDING)
+        with self.assertRaises(RotationDenied):
+            prepare_rotation(principal=self.executor, confirming_principal=self.confirmer,
+                             dry_run=second_dry, owner_id=self.owner.pk)
+        assessment = assess_key_retirement(principal=self.executor, owner_id=self.owner.pk, key_version=1)
+        self.assertIn("UNFINISHED_JOURNAL", assessment.reason_codes)
+
+        other = User.objects.create_user("rotation-unrelated@example.test", "password")
+        other_dek = b"u" * 32
+        wrapped = wrap_dek(kek=self.keks[1], dek=other_dek, owner_id=other.pk, key_version=1)
+        other_key = VaultOwnerKey.objects.create(owner=other, key_version=1, kek_generation=1,
+            envelope_version=wrapped.envelope_version, nonce=wrapped.nonce,
+            wrapped_dek=wrapped.wrapped_dek, tag=wrapped.tag)
+        record = VaultRecord(owner=other, credential_type=VaultRecord.CredentialType.GENERIC_SECRET,
+            label="unrelated", service_label="", origin="", key_version=1,
+            nonce=b"0" * 12, ciphertext=b"x", tag=b"0" * 16)
+        envelope = encrypt(dek=other_dek, plaintext=b'{"secret":"other"}', context=EncryptionContext(
+            other.pk, str(record.pk), record.credential_type), key_version=other_key.key_version)
+        record.nonce, record.ciphertext, record.tag = envelope.nonce, envelope.ciphertext, envelope.tag; record.save()
+        unrelated = assess_dek_rotation(principal=self.executor, owner_id=other.pk)
+        self.assertEqual((unrelated.eligible_count, unrelated.blocked_count), (1, 0))
+
+    def test_fresh_post_lock_time_rejects_expired_confirmation_without_mutation(self):
+        key_row, dek = self._key(); record = self._record(key_row, dek)
+        dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
+        operation, confirmation = prepare_rotation(
+            principal=self.executor, confirming_principal=self.confirmer, dry_run=dry, owner_id=self.owner.pk)
+        confirmation.expires_at = self.now + timedelta(minutes=5); confirmation.save(update_fields=("expires_at",))
+        with mock.patch("vault.rotation._now", side_effect=[self.now, self.now + timedelta(minutes=6)]):
+            with self.assertRaises(RotationDenied):
+                _execute_disposable_dek_rotation(principal=self.executor, operation_id=operation.pk,
+                                                 owner_id=self.owner.pk)
+        key_row.refresh_from_db(); record.refresh_from_db(); operation.refresh_from_db()
+        self.assertTrue(key_row.active_slot); self.assertEqual(record.key_version, 1)
+        self.assertEqual(operation.state, operation.State.PENDING)
+
+    def test_fresh_post_lock_time_rejects_expired_executor_without_mutation(self):
+        key_row, dek = self._key(); record = self._record(key_row, dek)
+        short = MaintenancePrincipal(self.executor.operator_id, self.executor.capabilities,
+                                     self.now + timedelta(minutes=5))
+        dry = assess_dek_rotation(principal=short, owner_id=self.owner.pk)
+        operation, _ = prepare_rotation(
+            principal=short, confirming_principal=self.confirmer, dry_run=dry, owner_id=self.owner.pk)
+        with mock.patch("vault.rotation._now", side_effect=[self.now, self.now + timedelta(minutes=6)]):
+            with self.assertRaises(RotationDenied):
+                _execute_disposable_dek_rotation(principal=short, operation_id=operation.pk,
+                                                 owner_id=self.owner.pk)
+        key_row.refresh_from_db(); record.refresh_from_db(); operation.refresh_from_db()
+        self.assertTrue(key_row.active_slot); self.assertEqual(record.key_version, 1)
+        self.assertEqual(operation.state, operation.State.PENDING)
 
 
 class NativeMySQLKeyRotationConcurrencyTests(TransactionTestCase):
@@ -218,7 +290,8 @@ class NativeMySQLKeyRotationConcurrencyTests(TransactionTestCase):
             self.owner.pk, str(record.pk), record.credential_type), key_version=1)
         record.nonce, record.ciphertext, record.tag = envelope.nonce, envelope.ciphertext, envelope.tag; record.save()
         dry = assess_dek_rotation(principal=self.executor, owner_id=self.owner.pk)
-        self.operation, _ = prepare_rotation(principal=self.executor, confirming_principal=confirmer, dry_run=dry)
+        self.operation, _ = prepare_rotation(principal=self.executor, confirming_principal=confirmer, dry_run=dry,
+                                             owner_id=self.owner.pk)
 
     def test_parallel_duplicate_dek_rotation_serializes_one_completion(self):
         operation_id, owner_id, principal = self.operation.pk, self.owner.pk, self.executor

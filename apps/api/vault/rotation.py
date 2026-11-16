@@ -79,11 +79,16 @@ def _context(row):
 def _blocked_owner(owner_id, *, exclude_operation_id=None):
     journals = VaultMaintenanceJournal.objects.filter(owner_id=owner_id, state__in=UNFINISHED)
     scoped = VaultMaintenanceJournal.objects.filter(purge_scopes__owner_id=owner_id, state__in=UNFINISHED)
+    ambiguous = VaultMaintenanceJournal.objects.filter(
+        operation_type__in=(VaultMaintenanceJournal.OperationType.KEK_ROTATION,
+                            VaultMaintenanceJournal.OperationType.DEK_ROTATION),
+        owner__isnull=True, state__in=UNFINISHED)
     if exclude_operation_id is not None:
         journals = journals.exclude(operation_id=exclude_operation_id)
         scoped = scoped.exclude(operation_id=exclude_operation_id)
+        ambiguous = ambiguous.exclude(operation_id=exclude_operation_id)
     return (VaultMaintenanceHold.objects.filter(owner_id=owner_id, released_at__isnull=True).exists() or
-            journals.exists() or scoped.exists())
+            journals.exists() or scoped.exists() or ambiguous.exists())
 
 
 def _backup_in_progress():
@@ -104,18 +109,21 @@ def _new_operation(*, principal, capability, mode, parameter_digest, state, pare
     )
 
 
-def assess_kek_rotation(*, principal, source_generation, target_generation):
+def assess_kek_rotation(*, principal, owner_id, source_generation, target_generation):
     now = _now(); _require(principal, "key.rotate.kek", at=now)
     if (isinstance(source_generation, bool) or not isinstance(source_generation, int) or source_generation <= 0 or
             isinstance(target_generation, bool) or not isinstance(target_generation, int) or target_generation <= 0 or
             source_generation == target_generation or target_generation != active_kek_generation()):
         raise RotationDenied("Key rotation denied")
     load_kek(source_generation); load_kek(target_generation)
-    rows = list(VaultOwnerKey.objects.filter(kek_generation=source_generation).order_by("owner_id", "key_version")[:MAX_ROTATION_RECORDS + 1])
+    if isinstance(owner_id, bool) or not isinstance(owner_id, int) or owner_id <= 0:
+        raise RotationDenied("Key rotation denied")
+    rows = list(VaultOwnerKey.objects.filter(owner_id=owner_id, kek_generation=source_generation)
+                .order_by("key_version")[:MAX_ROTATION_RECORDS + 1])
     if len(rows) > MAX_ROTATION_RECORDS:
         raise RotationDenied("Key rotation batch limit exceeded")
     candidates = [{"ownerId": row.owner_id, "keyVersion": row.key_version, "rowId": row.pk} for row in rows]
-    digest = digest_parameters({"kind": "KEK", "sourceGeneration": source_generation,
+    digest = digest_parameters({"kind": "KEK", "ownerId": owner_id, "sourceGeneration": source_generation,
                                 "targetGeneration": target_generation, "candidates": candidates})
     blocked = len(rows) if _backup_in_progress() else sum(_blocked_owner(row.owner_id) for row in rows)
     return _new_operation(principal=principal, capability=VaultMaintenanceOperation.Capability.ROTATE_KEK,
@@ -142,16 +150,37 @@ def assess_dek_rotation(*, principal, owner_id):
                           eligible=len(records) - blocked, blocked=blocked, now=now)
 
 
-def prepare_rotation(*, principal, confirming_principal, dry_run, ttl=timedelta(minutes=10)):
+def prepare_rotation(*, principal, confirming_principal, dry_run, owner_id,
+                     source_generation=None, target_generation=None, ttl=timedelta(minutes=10)):
     now = _now(); _require(principal, dry_run.capability, at=now); _require(confirming_principal, dry_run.capability, at=now)
     if (principal.operator_id == confirming_principal.operator_id or dry_run.mode != VaultMaintenanceOperation.Mode.DRY_RUN or
             dry_run.state != VaultMaintenanceOperation.State.COMPLETED or dry_run.blocked_count or dry_run.eligible_count <= 0 or
             not timedelta(seconds=1) <= ttl <= timedelta(hours=1)):
         raise RotationDenied("Key rotation denied")
     with transaction.atomic():
+        VaultMaintenanceGuard.objects.select_for_update().get(pk=1)
+        owner = User.objects.select_for_update().get(pk=owner_id)
         locked = VaultMaintenanceOperation.objects.select_for_update().get(pk=dry_run.pk)
-        if locked.executions.exists():
+        if locked.executions.exists() or _blocked_owner(owner_id):
             raise RotationDenied("Key rotation denied")
+        if locked.capability == VaultMaintenanceOperation.Capability.ROTATE_KEK:
+            rows = list(VaultOwnerKey.objects.select_for_update().filter(
+                owner=owner, kek_generation=source_generation).order_by("key_version"))
+            candidates = [{"ownerId": row.owner_id, "keyVersion": row.key_version, "rowId": row.pk} for row in rows]
+            expected = digest_parameters({"kind": "KEK", "ownerId": owner_id,
+                "sourceGeneration": source_generation, "targetGeneration": target_generation,
+                "candidates": candidates})
+            if (not rows or source_generation == target_generation or target_generation != active_kek_generation() or
+                    locked.parameter_digest != expected):
+                raise RotationDenied("Key rotation denied")
+        else:
+            records = list(VaultRecord.objects.select_for_update().filter(owner=owner)
+                           .exclude(lifecycle=VaultRecord.Lifecycle.PURGED).order_by("id"))
+            candidates = [{"recordId": str(row.pk), "revision": row.revision, "keyVersion": row.key_version,
+                           "lifecycle": row.lifecycle} for row in records]
+            expected = digest_parameters({"kind": "DEK", "ownerId": owner_id, "candidates": candidates})
+            if not records or locked.parameter_digest != expected:
+                raise RotationDenied("Key rotation denied")
         operation = _new_operation(principal=principal, capability=locked.capability,
                                    mode=VaultMaintenanceOperation.Mode.EXECUTE,
                                    parameter_digest=locked.parameter_digest,
@@ -167,6 +196,7 @@ def prepare_rotation(*, principal, confirming_principal, dry_run, ttl=timedelta(
             operation_type=(VaultMaintenanceJournal.OperationType.KEK_ROTATION
                             if locked.capability == VaultMaintenanceOperation.Capability.ROTATE_KEK
                             else VaultMaintenanceJournal.OperationType.DEK_ROTATION),
+            owner=owner, old_key_version=source_generation, new_key_version=target_generation,
             state=VaultMaintenanceJournal.State.PENDING)
     return operation, confirmation
 
@@ -180,11 +210,13 @@ def execute_dek_rotation(**kwargs):
 
 
 def _lock_and_validate(*, principal, operation_id, capability):
-    now = _now(); _require(principal, capability, at=now)
+    _require(principal, capability, at=_now())
     VaultMaintenanceGuard.objects.select_for_update().get(pk=1)
     operation = VaultMaintenanceOperation.objects.select_for_update().select_related("parent_dry_run").get(pk=operation_id)
     confirmation = VaultMaintenanceConfirmation.objects.select_for_update().get(operation=operation)
     journal = VaultMaintenanceJournal.objects.select_for_update().get(operation=operation)
+    now = _now()
+    _require(principal, capability, at=now)
     if (operation.capability != capability or operation.operator_id != principal.operator_id or
             operation.state != VaultMaintenanceOperation.State.PENDING or journal.state != VaultMaintenanceJournal.State.PENDING or
             confirmation.parameter_digest != operation.parameter_digest or confirmation.consumed_at is not None or
@@ -192,7 +224,6 @@ def _lock_and_validate(*, principal, operation_id, capability):
             confirmation.issued_by_operator_id == "legacy-unattributed" or
             confirmation.issued_by_operator_id == principal.operator_id):
         raise RotationDenied("Key rotation denied")
-    _require(principal, capability, at=_now())
     return operation, confirmation, journal
 
 
@@ -200,7 +231,8 @@ def _complete(operation, confirmation, journal, now):
     confirmation.consumed_at = now; confirmation.save(update_fields=("consumed_at",))
     journal.state = VaultMaintenanceJournal.State.COMPLETED; journal.completed_at = now
     journal.checkpoint_digest = digest_parameters({"operationId": str(operation.pk), "completedAt": now.isoformat()})
-    journal.save(update_fields=("state", "completed_at", "checkpoint_digest", "updated_at"))
+    journal.save(update_fields=("owner", "old_key_version", "new_key_version", "state", "completed_at",
+                                "checkpoint_digest", "updated_at"))
     operation.state = VaultMaintenanceOperation.State.COMPLETED; operation.started_at = now; operation.completed_at = now
     operation.save(update_fields=("state", "started_at", "completed_at"))
 
@@ -211,13 +243,14 @@ def _execute_disposable_kek_rotation(*, principal, operation_id, source_generati
         operation, confirmation, journal = _lock_and_validate(
             principal=principal, operation_id=operation_id,
             capability=VaultMaintenanceOperation.Capability.ROTATE_KEK)
-        owner_ids = list(VaultOwnerKey.objects.filter(kek_generation=source_generation)
-                         .order_by("owner_id").values_list("owner_id", flat=True).distinct())
-        list(User.objects.select_for_update().filter(pk__in=owner_ids).order_by("pk"))
-        rows = list(VaultOwnerKey.objects.select_for_update().filter(kek_generation=source_generation)
-                    .order_by("owner_id", "key_version"))
+        if journal.owner_id is None:
+            raise RotationDenied("Key rotation denied")
+        User.objects.select_for_update().get(pk=journal.owner_id)
+        rows = list(VaultOwnerKey.objects.select_for_update().filter(
+            owner_id=journal.owner_id, kek_generation=source_generation).order_by("key_version"))
         candidates = [{"ownerId": row.owner_id, "keyVersion": row.key_version, "rowId": row.pk} for row in rows]
-        expected = digest_parameters({"kind": "KEK", "sourceGeneration": source_generation,
+        expected = digest_parameters({"kind": "KEK", "ownerId": journal.owner_id,
+                                      "sourceGeneration": source_generation,
                                       "targetGeneration": target_generation, "candidates": candidates})
         if (not rows or len(rows) > MAX_ROTATION_RECORDS or operation.parameter_digest != expected or
                 target_generation != active_kek_generation() or _backup_in_progress() or
@@ -243,6 +276,8 @@ def _execute_disposable_dek_rotation(*, principal, operation_id, owner_id):
         operation, confirmation, journal = _lock_and_validate(
             principal=principal, operation_id=operation_id,
             capability=VaultMaintenanceOperation.Capability.ROTATE_DEK)
+        if journal.owner_id != owner_id:
+            raise RotationDenied("Key rotation denied")
         owner = User.objects.select_for_update().get(pk=owner_id)
         key_rows = list(VaultOwnerKey.objects.select_for_update().filter(owner=owner).order_by("key_version"))
         records = list(VaultRecord.objects.select_for_update().filter(owner=owner)
@@ -294,6 +329,11 @@ def assess_key_retirement(*, principal, owner_id, key_version):
     if VaultMaintenanceHold.objects.filter(owner_id=owner_id, released_at__isnull=True).exists(): reasons.add("ACTIVE_HOLD")
     if VaultMaintenanceJournal.objects.filter(Q(owner_id=owner_id) | Q(purge_scopes__owner_id=owner_id),
                                                state__in=UNFINISHED).exists(): reasons.add("UNFINISHED_JOURNAL")
+    if VaultMaintenanceJournal.objects.filter(
+            operation_type__in=(VaultMaintenanceJournal.OperationType.KEK_ROTATION,
+                                VaultMaintenanceJournal.OperationType.DEK_ROTATION),
+            owner__isnull=True, state__in=UNFINISHED).exists():
+        reasons.add("UNFINISHED_JOURNAL")
     if VaultBackupSet.objects.exclude(state=VaultBackupSet.State.FAILED).exists(): reasons.add("BACKUP_DEPENDENCY_UNKNOWN")
     try: load_kek(row.kek_generation)
     except Exception: reasons.add("HISTORICAL_KEK_MISSING")

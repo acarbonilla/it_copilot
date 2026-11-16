@@ -71,3 +71,21 @@ P2-01 and P2-02 block future operational qualification enablement. None is repre
 ## Source inventory and restrictions
 
 Implementation is contained in `vault/keys.py`, `vault/models.py`, migration 0007, `vault/services.py`, `vault/rotation.py`, configuration, and `vault/tests/test_key_rotation.py`. No operational key rotation, retirement, backup/recovery, or purge was executed. Publication is authorized by IC-023-T02C-2-GIT-01; deployment, key activation, operational actions, and PR merge remain prohibited. Merge requires separate explicit Product Owner authorization.
+
+## FIX-01 targeted review remediation
+
+IC-023-T02C-2-FIX-01 addresses the three P2 findings reported against PR #34 head `343e8d9e20e5faabe610b39d16540f4bcd907bcd`:
+
+- **ROT-P2-01:** preparation previously created an unscoped journal, so pending rotations were invisible to owner conflict and retirement queries. KEK batches are now owner-bounded; preparation locks the global guard and owner, revalidates the immutable candidate digest, persists the owner (and KEK source/target generations) atomically, and rejects overlapping owner work. Ambiguous unfinished legacy KEK/DEK journals fail closed globally.
+- **ROT-P2-02:** confirmation expiry was previously compared with time captured before lock acquisition. Execution now obtains fresh trusted server time after the global guard and operation/confirmation/journal locks and uses it for both executor and confirmation expiry. Tests prove that post-wait expiry causes no key or credential mutation.
+- **ROT-P2-03:** owner/source/target journal attributes were assigned in memory but omitted from `update_fields`. Completion now persists `owner`, `old_key_version`, and `new_key_version` in the same transaction as cryptographic publication and terminal state. Reloaded KEK and DEK journals contain the verified transformation metadata; rollback leaves no false completion.
+
+Directly affected verification:
+
+- `python manage.py test vault.tests.test_key_rotation.KeyRotationTests --settings=config.settings.test -v 2` — 9 run, 9 passed, 0 skipped.
+- `python manage.py test vault.tests.test_key_rotation.NativeMySQLKeyRotationConcurrencyTests --settings=config.settings.local -v 2 --noinput` — 1 run, 1 passed, 0 skipped on disposable `test_my_database`, which Django destroyed afterward.
+- No schema change was required. Django system check, migration drift, cached diff, and secret-safety checks are publication gates.
+
+The corrective commit uses message `fix(vault): address IC-023-T02C-2 rotation review findings`; its canonical SHA is the commit containing this section and the updated PR #34 head. Changed source is limited to `vault/rotation.py`, `vault/tests/test_key_rotation.py`, and this document.
+
+Remaining T02D items are unchanged: L01 interrupted-operation reconciliation, L02 unverified native interleavings, L03 operational custody/ACL/SID/activation/escrow, P2-01 snapshot streaming-size enforcement, P2-02 signed-manifest validity enforcement, and D01–D05. Operational rotation/retirement remains prohibited, operational destructive purge remains under mandatory HOLD, and PR #34 merge remains prohibited without separate Product Owner authorization.
