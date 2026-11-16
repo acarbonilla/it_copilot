@@ -285,6 +285,7 @@ class VaultMaintenanceConfirmation(models.Model):
     operation = models.OneToOneField(VaultMaintenanceOperation, on_delete=models.PROTECT, related_name="confirmation")
     parameter_digest = models.CharField(max_length=64, editable=False)
     artifact_digest = models.CharField(max_length=64, unique=True, editable=False)
+    issued_by_operator_id = models.CharField(max_length=64, editable=False)
     expires_at = models.DateTimeField(editable=False)
     consumed_at = models.DateTimeField(null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)

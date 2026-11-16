@@ -11,6 +11,7 @@ from .lifecycle import purge_time_is_eligible
 from .maintenance import MaintenancePrincipal, digest_parameters
 from .models import (
     VaultBackupSet,
+    VaultMaintenanceGuard,
     VaultMaintenanceHold,
     VaultMaintenanceJournal,
     VaultMaintenanceOperation,
@@ -67,6 +68,8 @@ def create_hold(*, principal, owner, scope, reason, record=None):
     parameters = {"ownerId": owner.pk, "recordId": str(record.pk) if record else None,
                   "scope": scope, "reason": reason}
     with transaction.atomic():
+        VaultMaintenanceGuard.objects.select_for_update().get(pk=1)
+        type(owner).objects.select_for_update().get(pk=owner.pk)
         operation = VaultMaintenanceOperation.objects.create(
             operator_id=principal.operator_id,
             capability=VaultMaintenanceOperation.Capability.HOLD_CREATE,
@@ -97,6 +100,8 @@ def release_hold(*, principal, hold):
     if hold.released_at is not None:
         return hold
     with transaction.atomic():
+        VaultMaintenanceGuard.objects.select_for_update().get(pk=1)
+        type(hold.owner).objects.select_for_update().get(pk=hold.owner_id)
         locked = VaultMaintenanceHold.objects.select_for_update().get(pk=hold.pk)
         if locked.released_at is not None:
             return locked
