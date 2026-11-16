@@ -32,6 +32,7 @@ class VaultOwnerKey(models.Model):
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="vault_keys")
     key_version = models.PositiveIntegerField()
+    kek_generation = models.PositiveIntegerField(default=1, editable=False)
     envelope_version = models.PositiveSmallIntegerField(default=ENVELOPE_VERSION, editable=False)
     nonce = models.BinaryField(max_length=NONCE_BYTES, editable=False)
     wrapped_dek = models.BinaryField(max_length=DEK_BYTES, editable=False)
@@ -46,6 +47,7 @@ class VaultOwnerKey(models.Model):
             models.UniqueConstraint(fields=("owner", "key_version"), name="vault_owner_key_version_unique"),
             models.UniqueConstraint(fields=("owner", "active_slot"), name="vault_owner_one_active_key"),
             models.CheckConstraint(condition=models.Q(key_version__gt=0), name="vault_owner_key_version_positive"),
+            models.CheckConstraint(condition=models.Q(kek_generation__gt=0), name="vault_owner_kek_generation_positive"),
             models.CheckConstraint(condition=models.Q(envelope_version=1), name="vault_owner_key_envelope_v1"),
             models.CheckConstraint(condition=Exact(Length("nonce"), NONCE_BYTES), name="vault_owner_key_nonce_length"),
             models.CheckConstraint(condition=Exact(Length("wrapped_dek"), DEK_BYTES), name="vault_owner_key_wrapped_length"),

@@ -31,7 +31,7 @@ from .crypto import (
     unwrap_dek,
     wrap_dek,
 )
-from .keys import load_kek
+from .keys import active_kek_generation, load_kek
 from .models import DEK_BYTES, VaultOwnerKey, VaultRecord
 from .grants import GrantDenied, GrantServiceError, consume_grant, lock_valid_grant
 
@@ -354,13 +354,15 @@ def get_credential_metadata(*, actor, record_id):
 
 def _owner_key(owner):
     key_row = VaultOwnerKey.objects.select_for_update().filter(owner=owner, active_slot=True).first()
-    kek = load_kek()
+    kek_generation = active_kek_generation()
+    kek = load_kek(kek_generation)
     if key_row is None:
         dek = os.urandom(DEK_BYTES)
         wrapped = wrap_dek(kek=kek, dek=dek, owner_id=owner.pk, key_version=1)
         key_row = VaultOwnerKey.objects.create(
             owner=owner,
             key_version=wrapped.key_version,
+            kek_generation=kek_generation,
             envelope_version=wrapped.envelope_version,
             nonce=wrapped.nonce,
             wrapped_dek=wrapped.wrapped_dek,
@@ -374,7 +376,7 @@ def _owner_key(owner):
         wrapped_dek=bytes(key_row.wrapped_dek),
         tag=bytes(key_row.tag),
     )
-    return key_row, unwrap_dek(kek=kek, envelope=envelope, owner_id=owner.pk)
+    return key_row, unwrap_dek(kek=load_kek(key_row.kek_generation), envelope=envelope, owner_id=owner.pk)
 
 
 def _unwrap_key_row(owner, key_row):
@@ -387,7 +389,7 @@ def _unwrap_key_row(owner, key_row):
         wrapped_dek=bytes(key_row.wrapped_dek),
         tag=bytes(key_row.tag),
     )
-    return unwrap_dek(kek=load_kek(), envelope=envelope, owner_id=owner.pk)
+    return unwrap_dek(kek=load_kek(key_row.kek_generation), envelope=envelope, owner_id=owner.pk)
 
 
 def _key_by_version(key_rows, key_version):
