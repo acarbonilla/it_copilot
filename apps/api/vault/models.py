@@ -369,6 +369,25 @@ class VaultMaintenanceJournal(models.Model):
         indexes = [models.Index(fields=("operation_type", "state"), name="vault_journal_type_state_idx")]
 
 
+class VaultPurgeJournalScope(models.Model):
+    """Immutable candidate scope for a prepared batch purge journal."""
+    journal = models.ForeignKey(VaultMaintenanceJournal, on_delete=models.PROTECT, related_name="purge_scopes")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                              related_name="vault_purge_journal_scopes")
+    record = models.ForeignKey(VaultRecord, on_delete=models.PROTECT, related_name="purge_journal_scopes")
+    expected_revision = models.PositiveBigIntegerField(editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("journal", "record"), name="vault_purge_scope_journal_record_unique"),
+            models.CheckConstraint(condition=models.Q(expected_revision__gt=0), name="vault_purge_scope_revision_positive"),
+        ]
+        indexes = [
+            models.Index(fields=("owner", "record"), name="vault_purge_owner_record_idx"),
+        ]
+
+
 class VaultBackupSet(models.Model):
     class State(models.TextChoices):
         PREPARING = "PREPARING", "Preparing"
@@ -405,4 +424,32 @@ class VaultBackupSet(models.Model):
                                     ~models.Q(state="VERIFIED")), name="vault_backup_verified_evidence"),
             models.CheckConstraint(condition=(models.Q(state="FAILED", failed_at__isnull=False) |
                                     ~models.Q(state="FAILED")), name="vault_backup_failed_time"),
+        ]
+
+
+class VaultRecoveryEvidence(models.Model):
+    """Nonsecret result of an authenticated disposable recovery verification."""
+    backup_set = models.OneToOneField(VaultBackupSet, on_delete=models.PROTECT, related_name="recovery_evidence")
+    prepared_operation_id = models.UUIDField(unique=True, editable=False)
+    dry_run_id = models.UUIDField(editable=False)
+    parameter_digest = models.CharField(max_length=64, editable=False)
+    candidate_set_digest = models.CharField(max_length=64, editable=False)
+    owner_set_digest = models.CharField(max_length=64, editable=False)
+    evidence_digest = models.CharField(max_length=64, unique=True, editable=False)
+    backup_operator_id = models.CharField(max_length=64, editable=False)
+    verifier_operator_id = models.CharField(max_length=64, editable=False)
+    verification_policy_version = models.CharField(max_length=32, editable=False)
+    invalidation_generation = models.PositiveIntegerField(default=0, editable=False)
+    verified_at = models.DateTimeField(editable=False)
+    expires_at = models.DateTimeField(editable=False)
+    cleanup_complete = models.BooleanField(default=False, editable=False)
+    invalidated_at = models.DateTimeField(null=True, blank=True, editable=False)
+    failure_code = models.CharField(max_length=32, null=True, blank=True, editable=False)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(expires_at__gt=models.F("verified_at")),
+                                   name="vault_recovery_evidence_expiry"),
+            models.CheckConstraint(condition=~models.Q(backup_operator_id=models.F("verifier_operator_id")),
+                                   name="vault_recovery_operator_separation"),
         ]

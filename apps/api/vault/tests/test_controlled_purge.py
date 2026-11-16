@@ -1,6 +1,7 @@
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from unittest import mock
 
 from django.db import close_old_connections, connection
 from django.test import TestCase, TransactionTestCase
@@ -31,6 +32,9 @@ from vault.purge import (
 class ControlledPurgeTests(TestCase):
     def setUp(self):
         self.now = timezone.now()
+        self.clock = mock.patch("vault.purge._trusted_now", return_value=self.now)
+        self.clock.start()
+        self.addCleanup(self.clock.stop)
         VaultMaintenanceGuard.objects.get_or_create(pk=1)
         self.owner = User.objects.create_user("purge-owner@example.test", "password")
         self.other_owner = User.objects.create_user("purge-other@example.test", "password")
@@ -73,10 +77,10 @@ class ControlledPurgeTests(TestCase):
     def _prepared(self, candidates=None):
         candidates = candidates or [self._candidate()]
         dry_run = assess_purge_candidates(
-            principal=self.executor, candidates=candidates, backup_checkpoint_id=self.backup.pk, now=self.now)
+            principal=self.executor, candidates=candidates, backup_checkpoint_id=self.backup.pk)
         operation, confirmation = prepare_purge_execution(
             principal=self.executor, confirming_principal=self.confirmer, dry_run=dry_run,
-            candidates=candidates, backup_checkpoint_id=self.backup.pk, now=self.now)
+            candidates=candidates, backup_checkpoint_id=self.backup.pk)
         return candidates, dry_run, operation, confirmation
 
     def test_candidates_are_bounded_unique_and_deterministically_bound(self):
@@ -100,7 +104,7 @@ class ControlledPurgeTests(TestCase):
     def test_assessment_is_read_only_and_changed_set_cannot_prepare_execution(self):
         candidate = self._candidate()
         dry_run = assess_purge_candidates(
-            principal=self.executor, candidates=[candidate], backup_checkpoint_id=self.backup.pk, now=self.now)
+            principal=self.executor, candidates=[candidate], backup_checkpoint_id=self.backup.pk)
         self.record.refresh_from_db()
         self.assertEqual(self.record.lifecycle, VaultRecord.Lifecycle.DELETED)
         self.assertEqual(dry_run.eligible_count, 1)
@@ -109,19 +113,19 @@ class ControlledPurgeTests(TestCase):
         with self.assertRaises(ControlledPurgeDenied):
             prepare_purge_execution(
                 principal=self.executor, confirming_principal=self.confirmer, dry_run=dry_run,
-                candidates=[altered], backup_checkpoint_id=self.backup.pk, now=self.now)
+                candidates=[altered], backup_checkpoint_id=self.backup.pk)
 
     def test_confirmation_requires_independent_capable_principal_and_is_bound(self):
         candidate = self._candidate()
         dry_run = assess_purge_candidates(
-            principal=self.executor, candidates=[candidate], backup_checkpoint_id=self.backup.pk, now=self.now)
+            principal=self.executor, candidates=[candidate], backup_checkpoint_id=self.backup.pk)
         with self.assertRaises(ControlledPurgeDenied):
             prepare_purge_execution(
                 principal=self.executor, confirming_principal=self.executor, dry_run=dry_run,
-                candidates=[candidate], backup_checkpoint_id=self.backup.pk, now=self.now)
+                candidates=[candidate], backup_checkpoint_id=self.backup.pk)
         operation, confirmation = prepare_purge_execution(
             principal=self.executor, confirming_principal=self.confirmer, dry_run=dry_run,
-            candidates=[candidate], backup_checkpoint_id=self.backup.pk, now=self.now)
+            candidates=[candidate], backup_checkpoint_id=self.backup.pk)
         self.assertEqual(confirmation.operation_id, operation.pk)
         self.assertEqual(confirmation.parameter_digest, operation.parameter_digest)
         self.assertEqual(confirmation.issued_by_operator_id, self.confirmer.operator_id)
@@ -130,7 +134,7 @@ class ControlledPurgeTests(TestCase):
     def test_generic_verified_backup_never_qualifies_operational_execution(self):
         candidates, _dry_run, operation, confirmation = self._prepared()
         with self.assertRaises(BackupQualificationUnavailable):
-            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates, now=self.now)
+            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates)
         self.record.refresh_from_db(); operation.refresh_from_db(); confirmation.refresh_from_db()
         self.assertEqual(self.record.lifecycle, VaultRecord.Lifecycle.DELETED)
         self.assertIsNotNone(self.record.ciphertext)
@@ -143,16 +147,15 @@ class ControlledPurgeTests(TestCase):
         self.record.revision += 1
         self.record.save(update_fields=("revision",))
         with self.assertRaises(ControlledPurgeDenied):
-            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates, now=self.now)
+            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates)
         self.record.refresh_from_db()
         self.assertEqual(self.record.lifecycle, VaultRecord.Lifecycle.DELETED)
 
-        candidate = self._candidate()
+        candidate = self._candidate(self.second)
         candidates, _dry_run, operation, _confirmation = self._prepared([candidate])
-        with self.assertRaises(ControlledPurgeDenied):
-            execute_purge(
-                principal=self.executor, operation_id=operation.pk, candidates=candidates,
-                now=self.now + timedelta(minutes=11))
+        with mock.patch("vault.purge._trusted_now", return_value=self.now + timedelta(minutes=11)):
+            with self.assertRaises(ControlledPurgeDenied):
+                execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates)
 
     def test_active_hold_rejects_entire_batch_without_partial_transition(self):
         candidates = [self._candidate(self.record), self._candidate(self.second)]
@@ -169,7 +172,7 @@ class ControlledPurgeTests(TestCase):
             created_operation=hold_operation,
         )
         with self.assertRaises(ControlledPurgeDenied):
-            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates, now=self.now)
+            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates)
         self.record.refresh_from_db(); self.second.refresh_from_db()
         self.assertEqual(self.record.lifecycle, VaultRecord.Lifecycle.DELETED)
         self.assertEqual(self.second.lifecycle, VaultRecord.Lifecycle.DELETED)
@@ -184,7 +187,7 @@ class ControlledPurgeTests(TestCase):
                 with self.assertRaises(ControlledPurgeDenied):
                     assess_purge_candidates(
                         principal=principal, candidates=[self._candidate()],
-                        backup_checkpoint_id=self.backup.pk, now=self.now)
+                        backup_checkpoint_id=self.backup.pk)
         self.assertEqual(VaultMaintenanceOperation.objects.filter(
             capability=VaultMaintenanceOperation.Capability.CREDENTIAL_PURGE).count(), 0)
 
@@ -197,15 +200,14 @@ class ControlledPurgeTests(TestCase):
             restore_expires_at=self.now + timedelta(seconds=1),
         )
         candidate = self._candidate(record)
-        dry_run = assess_purge_candidates(
-            principal=self.executor, candidates=[candidate], backup_checkpoint_id=self.backup.pk,
-            now=self.now + timedelta(seconds=1))
+        with mock.patch("vault.purge._trusted_now", return_value=self.now + timedelta(seconds=1)):
+            dry_run = assess_purge_candidates(
+                principal=self.executor, candidates=[candidate], backup_checkpoint_id=self.backup.pk)
         operation, _confirmation = prepare_purge_execution(
             principal=self.executor, confirming_principal=self.confirmer, dry_run=dry_run,
-            candidates=[candidate], backup_checkpoint_id=self.backup.pk, now=self.now)
+            candidates=[candidate], backup_checkpoint_id=self.backup.pk)
         with self.assertRaises(ControlledPurgeDenied):
-            execute_purge(
-                principal=self.executor, operation_id=operation.pk, candidates=[candidate], now=self.now)
+            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=[candidate])
         record.refresh_from_db()
         self.assertEqual(record.lifecycle, VaultRecord.Lifecycle.DELETED)
 
@@ -214,11 +216,11 @@ class ControlledPurgeTests(TestCase):
         substituted = [PurgeCandidate(self.second.pk, self.second.owner_id, self.second.revision)]
         with self.assertRaises(ControlledPurgeDenied):
             execute_purge(
-                principal=self.executor, operation_id=operation.pk, candidates=substituted, now=self.now)
+                principal=self.executor, operation_id=operation.pk, candidates=substituted)
         confirmation.consumed_at = self.now
         confirmation.save(update_fields=("consumed_at",))
         with self.assertRaises(ControlledPurgeDenied):
-            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates, now=self.now)
+            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates)
         self.record.refresh_from_db()
         self.assertEqual(self.record.lifecycle, VaultRecord.Lifecycle.DELETED)
 
@@ -236,7 +238,7 @@ class ControlledPurgeTests(TestCase):
             owner=self.owner, state=VaultMaintenanceJournal.State.RUNNING,
         )
         with self.assertRaises(ControlledPurgeDenied):
-            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates, now=self.now)
+            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates)
         self.record.refresh_from_db()
         self.assertEqual(self.record.lifecycle, VaultRecord.Lifecycle.DELETED)
 
@@ -246,7 +248,7 @@ class ControlledPurgeTests(TestCase):
         operation.completed_at = self.now
         operation.save(update_fields=("state", "completed_at"))
         with self.assertRaises(ControlledPurgeDenied):
-            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates, now=self.now)
+            execute_purge(principal=self.executor, operation_id=operation.pk, candidates=candidates)
         self.record.refresh_from_db()
         self.assertEqual(self.record.lifecycle, VaultRecord.Lifecycle.DELETED)
 
@@ -258,6 +260,9 @@ class ControlledPurgeMySQLConcurrencyTests(TransactionTestCase):
         if connection.vendor != "mysql":
             self.skipTest("Native MySQL is required for authoritative purge concurrency evidence")
         self.now = timezone.now()
+        self.clock = mock.patch("vault.purge._trusted_now", return_value=self.now)
+        self.clock.start()
+        self.addCleanup(self.clock.stop)
         from vault.models import VaultMaintenanceGuard
         VaultMaintenanceGuard.objects.get_or_create(pk=1)
         self.owner = User.objects.create_user("purge-race@example.test", "password")
@@ -288,10 +293,10 @@ class ControlledPurgeMySQLConcurrencyTests(TransactionTestCase):
         self.candidates = [PurgeCandidate(self.record.pk, self.owner.pk, self.record.revision)]
         dry_run = assess_purge_candidates(
             principal=self.principal, candidates=self.candidates,
-            backup_checkpoint_id=self.backup.pk, now=self.now)
+            backup_checkpoint_id=self.backup.pk)
         self.operation, _confirmation = prepare_purge_execution(
             principal=self.principal, confirming_principal=confirmer, dry_run=dry_run,
-            candidates=self.candidates, backup_checkpoint_id=self.backup.pk, now=self.now)
+            candidates=self.candidates, backup_checkpoint_id=self.backup.pk)
 
     def test_concurrent_duplicate_attempts_both_fail_closed_without_transition(self):
         operation_id = self.operation.pk
@@ -301,7 +306,7 @@ class ControlledPurgeMySQLConcurrencyTests(TransactionTestCase):
             try:
                 execute_purge(
                     principal=self.principal, operation_id=operation_id,
-                    candidates=self.candidates, now=self.now)
+                    candidates=self.candidates)
             except ControlledPurgeDenied as exc:
                 return type(exc).__name__
             finally:

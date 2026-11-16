@@ -189,7 +189,7 @@ The initial focused run exposed the missing singleton maintenance-guard seed and
 - Operational purge is unavailable and fails closed at the qualification seam even when candidates, dry run, operator, confirmation, and a generic `VERIFIED` inventory are otherwise valid.
 - Positive execution tests deliberately do not patch, monkeypatch, instantiate, or bypass qualification.
 - No operational or non-test credential was accessed or changed.
-- Native MySQL duplicate-attempt locking evidence passed against a disposable test database; positive qualified-transition concurrency remains unavailable by the mandatory T02C-3 gate.
+- Native MySQL concurrent fail-closed attempts passed against a disposable test database. This evidence does not demonstrate successful purge serialization; positive qualified-transition concurrency remains **NOT VERIFIED**.
 - T02C-3 must implement authenticated manifest/bundle recovery verification and an authoritative, operation-matched qualification result without adding a bypass flag or generic inventory shortcut.
 - Confirmation issuer attribution is intentionally opaque and nonsecret; operator authentication remains protected-file based.
 - Tombstone retention remains separately governed; no tombstone deletion exists.
