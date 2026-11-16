@@ -23,8 +23,10 @@ from .models import (
     VaultMaintenanceJournal,
     VaultMaintenanceOperation,
     VaultOwnerKey,
+    VaultPurgeJournalScope,
     VaultRecord,
 )
+from .qualification import QualificationDenied, qualify_verified_backup
 
 
 PURGE_SCHEMA_VERSION = "vault-controlled-purge-v1"
@@ -37,6 +39,10 @@ class ControlledPurgeDenied(Exception):
 
 class BackupQualificationUnavailable(ControlledPurgeDenied):
     """T02C-3 has not supplied genuine operation-matched recovery evidence."""
+
+
+class OperationalPurgeDisabled(ControlledPurgeDenied):
+    """Independent TTDM boundary: evidence never enables operational execution in T02C-3."""
 
 
 @dataclass(frozen=True, order=True)
@@ -89,10 +95,15 @@ def purge_parameter_digest(*, candidates, dry_run_id, backup_checkpoint_id):
     })
 
 
-def _require_principal(principal):
+def _trusted_now():
+    """Production authority clock. Tests patch this function; callers cannot supply time."""
+    return timezone.now()
+
+
+def _require_principal(principal, *, at=None):
     if not isinstance(principal, MaintenancePrincipal) or "credential.purge" not in principal.capabilities:
         raise ControlledPurgeDenied("Controlled purge denied")
-    if principal.expires_at <= timezone.now():
+    if principal.expires_at <= (at or _trusted_now()):
         raise ControlledPurgeDenied("Controlled purge denied")
 
 
@@ -105,20 +116,23 @@ def _active_hold_exists(record):
 
 def _conflicting_journal_exists(record, operation=None):
     query = VaultMaintenanceJournal.objects.filter(
-        Q(owner_id=record.owner_id) | Q(record_id=record.pk),
+        Q(owner_id=record.owner_id) | Q(record_id=record.pk) |
+        Q(purge_scopes__owner_id=record.owner_id) | Q(purge_scopes__record_id=record.pk) |
+        Q(operation_type=VaultMaintenanceJournal.OperationType.PURGE, owner__isnull=True, record__isnull=True,
+          purge_scopes__isnull=True),
         state__in=(VaultMaintenanceJournal.State.PENDING, VaultMaintenanceJournal.State.RUNNING,
                    VaultMaintenanceJournal.State.PAUSED),
     )
     if operation is not None:
         query = query.exclude(operation=operation)
-    return query.exists()
+    return query.distinct().exists()
 
 
-def assess_purge_candidates(*, principal, candidates, backup_checkpoint_id, now=None):
+def assess_purge_candidates(*, principal, candidates, backup_checkpoint_id):
     """Create a candidate-bound read-only assessment. It never qualifies backup or mutates a credential."""
-    _require_principal(principal)
+    now = _trusted_now()
+    _require_principal(principal, at=now)
     canonical = canonicalize_candidates(candidates)
-    now = now or timezone.now()
     operation_id = uuid.uuid4()
     parameter_digest = purge_parameter_digest(
         candidates=canonical, dry_run_id=operation_id, backup_checkpoint_id=backup_checkpoint_id)
@@ -156,16 +170,16 @@ def assess_purge_candidates(*, principal, candidates, backup_checkpoint_id, now=
 
 
 def prepare_purge_execution(*, principal, confirming_principal, dry_run, candidates,
-                            backup_checkpoint_id, confirmation_ttl=timedelta(minutes=10), now=None):
+                            backup_checkpoint_id, confirmation_ttl=timedelta(minutes=10)):
     """Prepare immutable execution metadata and an independently authorized one-use confirmation."""
-    _require_principal(principal)
-    _require_principal(confirming_principal)
+    now = _trusted_now()
+    _require_principal(principal, at=now)
+    _require_principal(confirming_principal, at=now)
     if principal.operator_id == confirming_principal.operator_id:
         raise ControlledPurgeDenied("Controlled purge denied")
     if not isinstance(confirmation_ttl, timedelta) or not timedelta(seconds=1) <= confirmation_ttl <= timedelta(hours=1):
         raise ControlledPurgeDenied("Controlled purge denied")
     canonical = canonicalize_candidates(candidates)
-    now = now or timezone.now()
     with transaction.atomic():
         locked_dry_run = VaultMaintenanceOperation.objects.select_for_update().get(pk=dry_run.pk)
         expected_digest = purge_parameter_digest(
@@ -193,17 +207,26 @@ def prepare_purge_execution(*, principal, confirming_principal, dry_run, candida
             expires_at=now + confirmation_ttl,
             issued_by_operator_id=confirming_principal.operator_id,
         )
-        VaultMaintenanceJournal.objects.create(
+        journal = VaultMaintenanceJournal.objects.create(
             operation=operation, operation_type=VaultMaintenanceJournal.OperationType.PURGE,
             state=VaultMaintenanceJournal.State.PENDING,
         )
+        VaultPurgeJournalScope.objects.bulk_create([
+            VaultPurgeJournalScope(journal=journal, owner_id=item.owner_id, record_id=item.credential_id,
+                                   expected_revision=item.expected_revision)
+            for item in canonical
+        ])
     return operation, confirmation
 
 
 def qualify_purge_backup(*, operation, backup_set, candidates):
-    """Strict T02C-3 seam. No T02C-1 state, flag, row, or digest can satisfy it."""
-    del operation, backup_set, candidates
-    raise BackupQualificationUnavailable("Qualified purge backup evidence is unavailable")
+    """Validate genuine evidence, then enforce the independent operational enablement HOLD."""
+    try:
+        qualify_verified_backup(operation=operation, backup_set=backup_set, candidates=candidates,
+                                trusted_now=_trusted_now())
+    except QualificationDenied:
+        raise BackupQualificationUnavailable("Qualified purge backup evidence is unavailable") from None
+    raise OperationalPurgeDisabled("Operational purge is not authorized")
 
 
 def _validate_locked_execution(*, operation, confirmation, dry_run, records, candidates, now):
@@ -220,6 +243,8 @@ def _validate_locked_execution(*, operation, confirmation, dry_run, records, can
             dry_run.parameter_digest != expected_digest or
             dry_run.eligible_count != len(candidates) or dry_run.blocked_count != 0 or
             confirmation.operation_id != operation.pk or confirmation.parameter_digest != expected_digest or
+            not confirmation.issued_by_operator_id or confirmation.issued_by_operator_id == "legacy-unattributed" or
+            confirmation.issued_by_operator_id == operation.operator_id or
             confirmation.consumed_at is not None or confirmation.expires_at <= now or
             len(records) != len(candidates)):
         raise ControlledPurgeDenied("Controlled purge denied")
@@ -233,17 +258,17 @@ def _validate_locked_execution(*, operation, confirmation, dry_run, records, can
             raise ControlledPurgeDenied("Controlled purge denied")
 
 
-def execute_purge(*, principal, operation_id, candidates, now=None):
+def execute_purge(*, principal, operation_id, candidates):
     """Execute only after T02C-3 qualification. In T02C-1 this always fails before mutation."""
-    _require_principal(principal)
     canonical = canonicalize_candidates(candidates)
-    now = now or timezone.now()
     with transaction.atomic():
         VaultMaintenanceGuard.objects.select_for_update().get(pk=1)
         list(User.objects.select_for_update().filter(
             pk__in=sorted({item.owner_id for item in canonical})).order_by("pk"))
         operation = VaultMaintenanceOperation.objects.select_for_update().select_related("parent_dry_run").get(
             pk=operation_id)
+        now = _trusted_now()
+        _require_principal(principal, at=now)
         if operation.operator_id != principal.operator_id:
             raise ControlledPurgeDenied("Controlled purge denied")
         dry_run = VaultMaintenanceOperation.objects.select_for_update().get(pk=operation.parent_dry_run_id)
