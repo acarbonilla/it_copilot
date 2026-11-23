@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 API_DIR = Path(__file__).resolve().parents[2]
@@ -112,6 +113,7 @@ CSRF_COOKIE_SECURE = COOKIE_SECURE
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")
 CORS_ALLOWED_ORIGINS = [FRONTEND_ORIGIN]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = (*default_headers, "x-vault-grant")
 CORS_URLS_REGEX = r"^/api/.*$"
 CSRF_TRUSTED_ORIGINS = [FRONTEND_ORIGIN, "http://localhost:8000", "http://localhost:8100"]
 CSRF_FAILURE_VIEW = "config.errors.csrf_failure"

@@ -1,7 +1,32 @@
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import User
 from vault.models import VaultRecord
+
+
+@override_settings(CORS_ALLOWED_ORIGINS=["http://localhost:3000"])
+class VaultCorsTests(SimpleTestCase):
+    def test_vault_grant_header_is_allowed_only_for_approved_origin(self):
+        requested_headers = "content-type,x-csrftoken,x-vault-grant"
+        approved = self.client.options(
+            "/api/v1/vault/credentials",
+            HTTP_ORIGIN="http://localhost:3000",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS=requested_headers,
+        )
+        self.assertEqual(approved.status_code, 200)
+        self.assertEqual(approved["Access-Control-Allow-Origin"], "http://localhost:3000")
+        allowed_headers = {value.strip() for value in approved["Access-Control-Allow-Headers"].split(",")}
+        self.assertIn("x-csrftoken", allowed_headers)
+        self.assertIn("x-vault-grant", allowed_headers)
+
+        unapproved = self.client.options(
+            "/api/v1/vault/credentials",
+            HTTP_ORIGIN="https://unapproved.example.test",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS=requested_headers,
+        )
+        self.assertNotIn("Access-Control-Allow-Origin", unapproved)
 
 
 class VaultApiTests(TestCase):
