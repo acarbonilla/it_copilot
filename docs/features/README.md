@@ -10,11 +10,11 @@ Maintain **one feature-level record** per approved feature at `docs/features/<fe
 | --- | --- | --- | --- |
 | F-00 | Foundation | IC-001 | Merged under original TTDM workflow; documentation closeout separate |
 | F-01 | Core Platform | IC-002–IC-005 | **Feature Completed**; PO accepted; [PR #9](https://github.com/acarbonilla/it_copilot/pull/9) merged into `main`; [acceptance review](F-01-acceptance-review.md) |
-| F-02 | Identity & Administration | IC-006–IC-008 plus F02-SEC-001; IC-024 deferred | Merged to `main` through PR #21; historical closeout record predates that merge; IC-024 remains deferred |
-| F-03 | Documentation Management | IC-009–IC-017 | Merged to `main` through PR #22; [post-merge verification](../02-Development/IC-030-F03-integration-post-merge-verification.md) complete with accepted limitations |
-| F-04 | Copilot | IC-018–IC-020 | **Formally closed** following Product Owner-authorized PR #26 merge; historical [post-merge verification](../02-Development/F-04-post-merge-verification-and-closure.md) retains its pre-closure snapshot |
-| F-05 | Personal Credential Vault | IC-021–IC-023 | **G1 RATIFIED — IC-021 IMPLEMENTED ON DRAFT BRANCH, SOL G2 PENDING; IC-022–IC-023 NOT AUTHORIZED**; [ratified contract](F-05-consolidated-g1-proposal.md); [IC-021 checkpoint](../02-Development/IC-021-F05-vault-domain-encryption-secure-crud.md) |
-| F-06 | MVP Acceptance | IC-025 | Not started |
+| F-02 | Identity & Administration | IC-006–IC-008 plus F02-SEC-001; IC-024 deferred | Merged to `main` through PR #21 and integrated in the [accepted local MVP baseline](F-06-final-acceptance-review.md); historical [feature evidence](F-02-final-acceptance-review.md) preserved; IC-024 remains deferred |
+| F-03 | Documentation Management | IC-009–IC-017 | **PASS WITH ACCEPTED LIMITATIONS**; merged through PR #22 and integrated in the accepted local MVP baseline; [post-merge verification](../02-Development/IC-030-F03-integration-post-merge-verification.md) |
+| F-04 | Copilot | IC-018–IC-020 | **Formally closed** through PO-authorized PR #26 and integrated in the accepted local MVP baseline with provider/private-data transfer disabled; historical [post-merge verification](../02-Development/F-04-post-merge-verification-and-closure.md) preserved |
+| F-05 | Personal Credential Vault | IC-021–IC-023 | **PASS WITH ACCEPTED LIMITATIONS**; PO accepted and integrated through PR #34; [final MVP reconciliation](F-06-final-acceptance-review.md) |
+| F-06 | MVP Acceptance | IC-025 | **PASS WITH ACCEPTED LIMITATIONS — LOCAL MVP DEVELOPMENT ONLY**; PO accepted 2026-11-23 at `af768f16…`; [final acceptance review](F-06-final-acceptance-review.md) |
 
 Standalone low-risk tasks may follow the Product Owner-authorized [Section 3A fast track](../process/TTDM-WA-001.md#section-3a--standalone-task-fast-track-controlled-exception) without joining a feature. Such tasks still require a reviewed PR and Product Owner approval before merging into `main`.
 
