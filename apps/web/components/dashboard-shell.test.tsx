@@ -12,14 +12,17 @@ const member = { id: 1, email: "member@example.com", is_app_admin: false, it_rol
 describe("DashboardShell", () => {
   beforeEach(() => replace.mockReset());
 
-  it("hides protected content until identity is restored, then labels placeholders", async () => {
+  it("hides protected content until identity is restored, then links available modules", async () => {
     vi.spyOn(api, "currentUser").mockResolvedValue(member);
     render(<DashboardShell />);
     expect(screen.getByRole("status")).toHaveTextContent("Loading");
     expect(await screen.findByText("member@example.com")).toBeVisible();
-    expect(screen.getAllByText("Not yet available")).toHaveLength(2);
+    expect(screen.getAllByText("Not yet available")).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Documents" })).toHaveAttribute("href", "/documents");
     expect(screen.getByRole("link", { name: "Copilot" })).toHaveAttribute("href", "/copilot");
+    expect(screen.getByRole("link", { name: "My Credentials" })).toHaveAttribute("href", "/vault");
+    expect(screen.getByRole("link", { name: "Open My Credentials" })).toHaveAttribute("href", "/vault");
+    expect(screen.queryByRole("link", { name: "Private Web Documentation" })).not.toBeInTheDocument();
     expect(screen.queryByText("Administration")).not.toBeInTheDocument();
   });
 
