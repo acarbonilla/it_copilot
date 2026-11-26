@@ -450,3 +450,172 @@ Database existence, ownership, provenance, schema and account grants remain unve
 The isolated worktree was verified at `8b9a0f3d9d71b126794ad7971575d5f7cf51c871` with the existing dashboard and dependency edits and installed Next.js `16.4.6`. The planned endpoints are API `http://127.0.0.1:8100` and frontend `http://localhost:3100`. Existing settings use `FRONTEND_ORIGIN` for both CORS and CSRF. Set it to the frontend URL and point `NEXT_PUBLIC_API_BASE_URL` to the API URL. Effective configuration and startup readiness are pending. Provider and private transfer remain disabled.
 
 Resume after an administrator authenticates locally through an approved method. Verify database provenance and least-privilege grants before applying R1-authorized committed migrations to the exact target. Manual Chromium acceptance remains on hold pending environment readiness, SOL review, and a separate Product Owner decision.
+
+## IC-026-ENV-05-R1-COMPLETE — Administrator handoff
+
+**ADMINISTRATOR AUTHENTICATION HOLD.** The isolated detached checkout `.worktrees/ic026-env05-r1-complete` was created from verified `origin/main` at `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. The merged dashboard routes and lockfile versions were confirmed. MySQL80 was running, TCP port 3306 was reachable, and both observed MySQL listeners were loopback-only. The host session had no MySQL login store and no authenticated administrator session was available to this task.
+
+The administrator must use an approved local password prompt or Workbench session to check `it_copilot_dev` and the dedicated account before provisioning. The project's database settings are `utf8mb4` and `utf8mb4_unicode_ci`. If the database exists, establish development-only provenance before any write. The proposed account is `it_copilot_dev_app@localhost`, scoped to the exact schema with Django runtime and migration privileges. Ownership, existence, grants, and migration state await authenticated verification.
+
+The planned endpoints are MySQL `127.0.0.1:3306`, API `http://127.0.0.1:8100`, and frontend `http://localhost:3100`. The frontend origin can be set through the existing CORS and CSRF configuration. Provider use and private transfer are disabled in the merged settings. Credential injection, ACL validation, Django and Vault secret generation, migrations, and synthetic data setup are pending. Manual testing readiness remains on hold.
+
+## IC-026-ENV-05-R2 — Credential reuse preflight
+
+The isolated detached checkout and local `origin/main` reference both resolve to `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. The Product Owner confirmed administrator access. The directory containing the explicitly authorized development `.env` is still required before inspecting configuration or authenticating with its credentials.
+
+Credential reuse remains unassessed. Database existence, account identity and grants, Git ignore coverage, Windows ACLs, and Django and Vault secret presence and provenance are unverified. This checkpoint made no database changes. Manual testing readiness remains on hold.
+
+### R2 follow-up — Credential file access
+
+The repository-root `.env` exists, is Git-ignored, and is absent from the Git index. Its Windows ACL inherits Modify permissions for a sandbox group and two additional security identifiers. It therefore fails the intended-principal-only access requirement. Credential reuse is unsuitable under the current ACL. The file contents were left unopened, so database existence, account grants, and Django and Vault secret presence and provenance remain unverified. Manual testing readiness is on hold pending correction of file access and credential verification.
+
+### R2 continuation — Authorized configuration verification
+
+The Product Owner explicitly authorized inspection of the repository-root `.env`. Git ignore and the inherited Windows permissions finding were reconfirmed. The configured endpoint is `127.0.0.1:3306` and the configured database is `my_database`. The target mismatch triggered the stop condition before MySQL authentication. The existence of `it_copilot_dev` and account grants remain unverified. The existing file is unsuitable for reuse as configured.
+
+The Django secret setting is populated and its development provenance is unverified. None of the recognized Vault KEK settings or the grant pepper was populated in this file. Vault secret readiness is **VAULT SECRET HOLD**. No secret values were recorded, and manual testing readiness remains on hold.
+
+## IC-026-ENV-05-R3 — Account verification checkpoint
+
+The Product Owner approved R3. Django can load a separate Git-ignored `.env` from the isolated checkout root or accept per-process environment variables. The configured account authenticated over Classic TCP at `127.0.0.1:3306` without selecting a default schema. Its own grant report included a global privilege entry, so it is unsuitable as the dedicated development runtime account. The target was not visible in the session metadata. This does not establish server-wide absence.
+
+No approved administrator login path was available in the host session. Administrator verification of target existence and provenance and creation or verification of a dedicated account remain on hold. No runtime configuration, ACL change, secret generation, schema change, migration, seeding, or service startup occurred.
+
+## IC-026-DEV-01 — Existing database safety checkpoint
+
+The temporary development exception authorized reusing the existing account without changing grants. The isolated checkout remained at `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. A read-only connection confirmed `my_database` at `127.0.0.1:3306`. Schema metadata indicated existing user, session, and security-audit data. Development-only provenance could not be established. Prior project evidence identifies this as the configured database left untouched during separate acceptance work. No user, session, audit, or application record contents were retrieved.
+
+Comparison to the migration ledger found 16 committed project migrations absent across Copilot, Documents, Security Audit, and Vault. No Vault tables were listed. Database classification triggered the stop condition before runtime configuration, secret provisioning, migrations, startup, or browser testing. An administrator or Product Owner must establish that existing records are development-only and free of sensitive data, or designate a verified safe development database.
+
+## IC-026-DEV-02B — Django Development Initialization
+
+The isolated checkout is at `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. The merged Documents, Copilot, and Vault routes and the Next.js and ESLint config pins at 16.4.6 were verified. The approved local MySQL account selected `it_copilot_dev` at `127.0.0.1:3306`. The schema used `utf8mb4` and `utf8mb4_unicode_ci` and had zero tables before initialization. The temporary development exception covered the account's existing global grants.
+
+Django loaded the isolated worktree's ignored root `.env`. Fresh development-only Django secret, 32-byte Vault KEK, and grant pepper were generated and verified through the runtime settings and key loader. The backend config and separate synthetic login file have explicit ACLs for the intended development principal and SYSTEM. Both files are ignored and untracked. The legacy root configuration was preserved.
+
+The reviewed migration plan covered Accounts, Auth, Content Types, Copilot, Documents, Security Audit, Sessions, and Vault. All 48 migrations applied to the development schema. Zero migrations remain. The dry-run migration drift check and the database-aware Django system check passed. One active, non-admin synthetic IT member was created through the Django user manager and verified with Django authentication. Its password is stored only in the protected local login file. No other test records were imported or seeded.
+
+The configured endpoints are API `http://127.0.0.1:8100` and frontend `http://localhost:3100`. Django CORS and CSRF trust the requested frontend origin and the ignored frontend override points at the API. Provider and private transfer are disabled. The isolated frontend has no local dependency installation. Browser testing also needs to check session and CSRF cookies because the requested endpoints use different site names with existing SameSite=Lax settings. No API, frontend, or browser was started. Backend initialization is complete. Manual browser readiness remains pending local frontend dependency installation and startup verification.
+
+## IC-026-T02C — Manual Runtime Verification
+
+The isolated checkout `.worktrees/ic026-env05-r1-complete` ran at `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. Django verified `it_copilot_dev`, 48 applied migrations, zero pending migrations, the synthetic login, both development Vault settings, and disabled provider/private transfer before startup. Django ran on `http://127.0.0.1:8100` and Next.js ran on `http://127.0.0.1:3100`. Process configuration aligned the CORS and CSRF frontend origin with the browser URL. Both listeners were loopback-only. No cookie or security settings changed.
+
+`npm ci` completed from the committed lockfile using Node 24.13.0 and npm 10.8.2. Installed Next.js and eslint-config-next were 16.4.6. React and React DOM were 19.3.1. Next.js compiled the exercised routes. The API returned HTTP 200 for the CSRF bootstrap, login, and authenticated identity.
+
+| Chromium check | Result |
+| --- | --- |
+| Anonymous, login, reload, logout | Passed. Protected routes redirected after logout and after simulated loss of the session cookie. Actual server-side expiration was not exercised. |
+| Dashboard | Passed. Documents, Copilot, and My Credentials linked to their routes. Private Web Documentation was unavailable and Administration was hidden for the member. |
+| Documents | Authenticated route and empty state passed. Upload and cross-owner behavior were not exercised. |
+| Copilot | Authenticated route passed. A synthetic query with no authorized source returned the insufficient-documentation response. Positive citation rendering requires an eligible fixture. |
+| My Credentials | Authenticated route, synthetic creation, reauthenticated reveal with no-store, and rejection of the same grant-bearing request on replay passed. A synthetic record was retained. |
+| Security | Missing-CSRF logout and non-admin users API requests returned 403. No uncaught page exceptions or external browser requests appeared. The primary run counted seven console errors. A focused denial run counted four console errors and captured two 401s and one 403. Console messages were not retained. |
+
+Disposition is **PARTIAL**. The core loopback runtime works with the approved synthetic login. Cross-owner denial, actual expiration, document processing, and positive Copilot citations remain unverified. No second synthetic identity was created. No operational or final F-07 acceptance is implied.
+
+## IC-026-T02D — Remaining Chromium coverage
+
+The existing isolated frontend and Django API returned HTTP 200 at their loopback endpoints on ports 3100 and 8100. The checkout remained at `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. Django preflight confirmed `it_copilot_dev`, 48 applied migrations, zero pending migrations, successful development key loading, and provider/private transfer disabled. The Owner and Member 2 aliases refer to separate synthetic non-admin accounts. The new Member 2 credential was stored in a Git-ignored file with access restricted to the development principal and SYSTEM.
+
+| Check | Evidence |
+| --- | --- |
+| Document upload and processing | Owner uploaded one synthetic TXT through the browser with HTTP 201. The document worker succeeded and the UI API reported `ready`. The retrieval job succeeded on its first attempt and published one searchable chunk. |
+| Positive Copilot citation | The first browser wait timed out, but the persisted grounding state was `REFERENCES` and native retrieval produced one owner match. A focused browser retry confirmed the authorized reference list showed the exact synthetic document title and Version 1. AI-generated synthesis stayed disabled. |
+| Cross-owner isolation | Member 2's lists excluded the Owner's document and Vault record. Document detail, download, and Vault detail each returned 404 without the corresponding synthetic label in the denial body. Member 2 asked the same Copilot question and received the insufficient-documentation response without the Owner citation. |
+| Actual session expiration | After verifying ownership of Member 2's current test session, only that session row's expiration timestamp was moved into the past. Chromium retained the cookie, Django returned 401 on the identity endpoint, and Documents redirected to login. Global policy was unchanged. |
+| Console triage | Relevant T02C 401/403 requests were identifiable in the Django logs, including anonymous identity, grant replay, and missing CSRF. T02D reproduced expected 401s after expiry and 404s for owner isolation. A focused Chromium diagnostic identified the login resource 404 as `/favicon.ico`. The original seven console messages were not retained individually, so an exact attribution is unavailable. No uncaught page exceptions or external browser requests were observed during the tested workflows. |
+
+Remaining operational limitations and HOLDs are unchanged. The append completes the requested manual runtime coverage for Product Owner and SOL review. The missing favicon is a nonblocking cosmetic issue, and the initial citation wait timeout cleared on a focused retry. This checkpoint does not declare final F-07 acceptance.
+
+## IC-026-T02E — Dashboard origin investigation
+
+The Product Owner reported a legacy-looking dashboard. The exact URL and browser context used for that inspection were unavailable. The fresh investigation found no listener on port 3000. Port 3100 was served by the existing Node/Next.js process linked by its command line and parent chain to the isolated worktree, with Next.js 16.4.6 and source SHA `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. Port 8000 responded from the separate Python `manage.py runserver` process associated with the legacy repository. Its exact working directory, loaded source SHA, and database were not independently established. Port 8100 was served by the Python `runserver 127.0.0.1:8100 --noreload` process whose launch chain includes the isolated worktree. This is the existing runtime previously verified against `it_copilot_dev`.
+
+Fresh Chromium opened `http://127.0.0.1:3100/dashboard`, followed the anonymous login redirect, and authenticated with the synthetic member. The dashboard showed Documents, Copilot, and My Credentials as Available and linked to `/documents`, `/copilot`, and `/vault`. All three links navigated successfully and the authenticated identity endpoint returned HTTP 200 on each page. Private Web Documentation was unavailable and unlinked. Administration was hidden. Browser requests used only the approved frontend and API origins. The run recorded two expected anonymous identity 401s and one resource 404 consistent with the previously reproduced missing favicon. No uncaught page exception occurred.
+
+The approved runtime served the corrected dashboard, so no restart or other runtime correction was needed. The Product Owner's earlier view was not reproduced. A different origin or prior browser state remains possible, and root cause cannot be assigned without the original URL or a fresh reproduction. The verified inspection URL is `http://127.0.0.1:3100/dashboard`. Final F-07 acceptance remains pending.
+
+## IC-026-T03 — Main runtime transition HOLD
+
+The primary checkout remains on `feature/documentation-management` at `7bbb4c663a7daebe659e700dd0240556f6cc86ff` with tracked edits and untracked files. The local `origin/main` ref and the isolated detached HEAD both resolve to approved SHA `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. The approved tree includes the Dashboard, Documents, Copilot, and Vault routes and pins Next.js 16.4.6. Dashboard source marks Private Web Documentation unavailable and gates Administration on the admin flag.
+
+The existing runtime remains in `.worktrees/ic026-env05-r1-complete`. Next.js listener PID `14380` descends from launcher `19208`, whose command line points to that worktree. Django listener PID `18692` descends from launcher `16084`, started with the worktree's API directory as its working directory. Both run under the local development account. The existing URLs are `http://localhost:3001` and `http://localhost:8001`. The launch used process-local overrides for the frontend origin and API URL. A read-only Django connection confirmed `it_copilot_dev` at `127.0.0.1:3306`. Git ignores both runtime config files. The backend `.env` grants explicit access to the development account and SYSTEM. The frontend `.env.local` inherits its directory ACLs.
+
+No process handoff or main-directory browser verification was performed. Login, module navigation, session refresh, logout, and provider/private-transfer traffic checks for the replacement runtime remain pending. Use a separate clean Git worktree pinned to the approved SHA for the replacement runtime at `http://127.0.0.1:3100` and `http://127.0.0.1:8100`. This checkpoint does not constitute F-07 acceptance.
+
+## IC-026-T03A — Permanent main runtime handoff
+
+With PO approval, the sibling worktree `../it_copilot_main_runtime` was created at detached SHA `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. Local `main` pointed at a different commit. The primary checkout stayed on its dirty feature branch. `npm ci` completed using the committed lockfile and installed Next.js 16.4.6. Next.js regenerated its tracked `next-env.d.ts` to point to development type output.
+
+Next.js listens at `http://127.0.0.1:3100` (listener `19100`, launcher `11248`). Django listens at `http://127.0.0.1:8100` (listener `19968`, launcher `19916`). The launch working directories were the sibling worktree's web and API directories. Django's system check passed and a read-only query confirmed `it_copilot_dev` at `127.0.0.1:3306`. An allowlisted transfer preserved the development database and Vault settings. Both ignored config files have explicit access for the development account and SYSTEM. Private transfer was verified disabled and provider enablement is hard-coded false in the approved settings.
+
+Chromium passed synthetic login, Dashboard, all three available module links, unavailable Private Web Documentation, hidden non-admin Administration, session refresh, logout, and protected-route redirect. It recorded 27 successful calls to the replacement API, zero external browser requests, and zero page exceptions. The isolated server trees were retired after verification. The legacy listeners on ports 3000 and 8000 remained present. Focused runtime handoff passed. Final F-07 acceptance remains with the PO.
+
+## IC-026-T04 — Copilot runtime diagnosis
+
+The permanent checkout at `../it_copilot_main_runtime` was at `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`. Frontend listener `19100` and API listener `19968` matched the T03A process trees at ports 3100 and 8100. Django selected `it_copilot_dev`, with 48 applied migrations and zero pending. Provider and private transfer were disabled. No worker process was observed. One processing job was pending and no index jobs were active. The diagnostic did not start a worker.
+
+The approved synthetic owner’s `F07 T02D Heliox Nebula`, Version 1, was ready. Its published MySQL full-text generation matched the current version and had one searchable chunk. The matching index job succeeded on its first attempt.
+
+Reproduce by signing in as the approved synthetic owner at `http://127.0.0.1:3100`, opening Copilot, creating a conversation, and submitting these questions in order:
+
+| Question | Expected | Observed |
+| --- | --- | --- |
+| What is the Heliox Nebula calibration code? | Reference-only result citing the synthetic title and Version 1 | One MySQL lexical candidate. HTTP 201 in 1,953 ms with `assistant_message.grounding_status=insufficient`, `provider_status=disabled`, and zero citations. No title or version reached the browser. |
+| What is the migratory range of the Andean flamingo? | Insufficient authorized documentation and zero citations | Zero MySQL lexical candidates. HTTP 201 in 86 ms with `assistant_message.grounding_status=insufficient`, `provider_status=disabled`, and zero citations. |
+
+Both response envelopes contained `conversation`, `user_message`, and `assistant_message`. The initial browser assertion was ambiguous because both turns rendered the same fallback. A follow-up Chromium run reopened the saved conversation and counted two fallback panels and zero reference lists. There were zero HTTP errors, external browser requests, or page exceptions in the submission run.
+
+Classification is API response behavior caused by local artifact-store configuration. The permanent runtime’s private storage root lacked both the original and extracted files for the synthetic version. Both files were present and passed integrity checks under the isolated worktree’s storage root. The evidence authorization step requires both files and drops the indexed candidate when integrity validation cannot find them. The positive result therefore failed before frontend rendering. The negative fallback behaved as expected.
+
+Request separate approval to align the permanent runtime with the approved protected development artifact store and then rerun both browser checks. No runtime configuration, application code, migrations, or artifact files were changed. The synthetic diagnostic conversation remains in the development database. The PO’s original wording was unavailable, so the two reported failures cannot be correlated exactly. Final F-07 acceptance remains pending.
+
+## IC-026-T05 — Protected development artifact store
+
+With PO approval, the permanent runtime at `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275` was configured through its ignored `.env` to use `C:/Users/dc/PycharmProjects/it_copilot_dev_artifacts`. Preflight confirmed `it_copilot_dev`, zero pending migrations, and disabled provider and private transfer. The application provisioned the root and verified its restrictive Windows ACL for the development principal and SYSTEM. The runtime config ACL was preserved.
+
+Only the approved synthetic owner’s current Version 1 original and extracted artifacts were copied from the isolated store under their existing relative storage keys. Source and destination passed the application’s byte-length and SHA-256 checks. The source files were retained. Database paths, schema, and application code were unchanged. This is a synthetic-only handoff; other artifact records were outside scope.
+
+Django alone was restarted from the permanent API directory, with launcher `20012` and listener `14760` on port 8100. The permanent frontend listener remained `19100` on port 3100. Chromium opened Documents and downloaded the approved fixture with HTTP 200. The calibration-code question returned HTTP 201 with one citation and rendered the correct title and Version 1. The flamingo question returned HTTP 201 with zero citations and rendered the insufficient-documentation fallback. Both responses reported the provider disabled. Chromium recorded zero external requests and zero uncaught page errors. The diagnostic conversation was retained. Focused verification passed; final F-07 acceptance remains pending.
+
+## F-07 — Product Owner Acceptance and Closeout
+
+**Acceptance date:** 2026-11-26
+
+**Disposition:** PASS WITH DOCUMENTED LIMITATIONS — LOCAL MVP DEVELOPMENT ONLY
+
+**Accepted application revision:** `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275`
+
+On 2026-11-26, after T05 and the successful Product Owner Copilot recheck, the Product Owner explicitly accepted F-07 for local MVP development and authorized this documentation-only closeout. This decision covers the local development workflow. Production certification remains outside scope.
+
+| Checkpoint | Acceptance evidence |
+| --- | --- |
+| T01 and SEC-02 | Dashboard and module navigation alignment reached main in PR #37. Next.js 16.4.6 is the accepted patch baseline. |
+| T02C and T02D | Browser and automated evidence covers Documents upload and processing, owner isolation, CSRF, session persistence and logout, and My Credentials with protected Vault access. |
+| T02E and T03A | The origin investigation verified the corrected dashboard. T03A established the permanent main development runtime. |
+| T04 | The permanent API found an indexed candidate but withheld the citation because its storage root lacked the fixture artifacts. The negative fallback worked. |
+| T05 and PO recheck | The protected store restored synthetic document access and the Version 1 reference in the permanent runtime. The unrelated question continued to show the insufficient-documentation fallback. The PO subsequently confirmed the Copilot recheck. |
+
+### Retained limitations
+
+- Copilot provides authorized references and a fallback. External generative AI and private-document transfer remain disabled. Private Web Documentation remains deferred.
+- The temporary global-privilege exception for the local development MySQL account remains. Migration of historical artifacts other than the approved T05 synthetic fixture was outside scope.
+- The historical citation wait timed out once and passed on a focused retry. Earlier browser-console messages were not retained individually, so exact attribution remains unavailable.
+- The PO did not personally recheck five checklist items. The acceptance decision relies on prior automated evidence for those items. This record does not attribute individual personal checks to the PO beyond the confirmed Copilot recheck.
+- Existing F-03, F-04, and F-05 limitations carry forward. F-05 operational Vault HOLDs, the destructive-purge HOLD, and the IC-024 account deletion deferral remain open or deferred as previously recorded.
+
+### Permanent local development runtime
+
+| Setting | Accepted local installation |
+| --- | --- |
+| Checkout | `C:/Users/dc/PycharmProjects/it_copilot_main_runtime` |
+| Application source | `2dff0dbd499592428aa3a7c6ebfa5dfcc716b275` |
+| Frontend | `http://127.0.0.1:3100` |
+| API | `http://127.0.0.1:8100` |
+| Database | `it_copilot_dev` on local MySQL |
+| Protected development artifact store | `C:/Users/dc/PycharmProjects/it_copilot_dev_artifacts` |
+
+Start local development services from the approved main-runtime checkout. The ignored configuration aligns the frontend API URL and Django browser origin, selects the development database, preserves the existing development Vault settings, and points Django to the protected artifact store. Use access-restricted local configuration and a private artifact directory outside served paths. The paths above record this installation. On another machine, choose local paths that meet the same requirements. A GitHub merge does not restart local services.
+
+The permanent checkout's pre-existing `next-env.d.ts` diff redirects generated type imports to `.next/dev/types`, as expected when Next.js runs in development mode. It remains local runtime housekeeping and is excluded from the documentation publication.
